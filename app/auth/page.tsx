@@ -62,7 +62,7 @@ export default function AuthPage() {
       }
 
       // signed in and valid -> redirect to home
-      router.replace('/');
+    window.location.replace('/');
     }
 
     check();
