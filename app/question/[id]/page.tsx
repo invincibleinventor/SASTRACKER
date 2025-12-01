@@ -6,7 +6,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js'; 
 import { ArrowLeft, Star, User, Clock, Send, Paperclip, ChevronUp, ChevronDown, Loader2, X, Info } from 'lucide-react';
 
-// --- CONFIGURATION ---
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -67,7 +66,7 @@ export default function QuestionDetailPage() {
   const [user, setUser] = useState<any>(null);
   const [question, setQuestion] = useState<any>(null);
   const [answers, setAnswers] = useState<any[]>([]);
-  const [userVotes, setUserVotes] = useState<Record<string, number>>({}); // Map answer_id -> vote_value
+  const [userVotes, setUserVotes] = useState<Record<string, number>>({}); 
   const [userRating, setUserRating] = useState<number | null>(null);
   
   const [newAnswer, setNewAnswer] = useState('');
@@ -76,21 +75,18 @@ export default function QuestionDetailPage() {
   const [uploading, setUploading] = useState(false);
   const answerFileRef = useRef<HTMLInputElement>(null);
 
-  // 1. Auth Check
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
     });
   }, []);
 
-  // 2. Fetch Data
   useEffect(() => {
     if (!id) return;
 
     const fetchData = async () => {
       setLoading(true);
       
-      // Fetch Question
       const { data: qData } = await supabase
         .from('questions')
         .select(`*, papers (academic_year, subject, exam_type, exam_year)`)
@@ -98,15 +94,12 @@ export default function QuestionDetailPage() {
         .single();
       setQuestion(qData);
 
-      // Fetch Answers
       const { data: aData } = await supabase
         .from('answers')
         .select('*')
         .eq('question_id', id)
-        .order('net_votes', { ascending: false }); // Use net_votes now
       setAnswers(aData || []);
 
-      // Fetch User's Votes & Rating if logged in
       if (user) {
         const { data: vData } = await supabase.from('answer_votes').select('answer_id, vote_value').eq('user_id', user.id);
         const votesMap: Record<string, number> = {};
@@ -120,10 +113,9 @@ export default function QuestionDetailPage() {
       setLoading(false);
     };
 
-    if (user !== undefined) fetchData(); // Wait for user check
+    if (user !== undefined) fetchData(); 
   }, [id, user]);
 
-  // 3. Post Answer
   const handlePostAnswer = async () => {
     if (!user) return router.push('/auth');
     if (!newAnswer.trim() && !answerImage) return;
@@ -161,14 +153,10 @@ export default function QuestionDetailPage() {
     }
   };
 
-  // 4. Robust Rate Question
   const handleRateQuestion = async (rating: number) => {
     if (!user) return router.push('/auth');
-    
-    // 1. Optimistic Update UI
     setUserRating(rating);
 
-    // 2. Upsert Rating
     const { error } = await supabase.from('question_ratings').upsert({
       user_id: user.id,
       question_id: id,
@@ -180,8 +168,6 @@ export default function QuestionDetailPage() {
       return;
     }
 
-    // 3. Recalculate Average (Simple approach for this app size)
-    // In production, use a Database Trigger. Here, we fetch and update.
     const { data: allRatings } = await supabase.from('question_ratings').select('rating').eq('question_id', id);
     if (allRatings) {
       const total = allRatings.reduce((acc, curr) => acc + curr.rating, 0);
@@ -191,12 +177,10 @@ export default function QuestionDetailPage() {
         rating_count: allRatings.length 
       }).eq('id', id);
       
-      // Update local state
       setQuestion((prev: any) => ({ ...prev, avg_rating: avg, rating_count: allRatings.length }));
     }
   };
 
-  // 5. Robust Vote Answer
   const handleVote = async (answerId: string, type: 1 | -1) => {
     if (!user) return router.push('/auth');
 
@@ -204,27 +188,19 @@ export default function QuestionDetailPage() {
     let newVoteValue: number | null = type;
     let voteDelta = 0;
 
-    // Logic: 
-    // - Click same button -> Remove vote (toggle off)
-    // - Click different button -> Switch vote
-    // - No prev vote -> Add vote
-
+   
     if (currentVote === type) {
-      // Remove vote
       newVoteValue = null;
       voteDelta = -type; 
       await supabase.from('answer_votes').delete().match({ user_id: user.id, answer_id: answerId });
     } else if (currentVote) {
-      // Switch vote (e.g. 1 to -1 means delta is -2)
       voteDelta = type * 2;
       await supabase.from('answer_votes').update({ vote_value: type }).match({ user_id: user.id, answer_id: answerId });
     } else {
-      // New vote
       voteDelta = type;
       await supabase.from('answer_votes').insert({ user_id: user.id, answer_id: answerId, vote_value: type });
     }
 
-    // Update Local State
     const nextVotes = { ...userVotes };
     if (newVoteValue === null) delete nextVotes[answerId];
     else nextVotes[answerId] = newVoteValue;
@@ -233,7 +209,6 @@ export default function QuestionDetailPage() {
     setAnswers(prev => prev.map(a => {
       if (a.id === answerId) {
         const newNet = (a.net_votes || 0) + voteDelta;
-        // Sync with DB cache
         supabase.from('answers').update({ net_votes: newNet }).eq('id', answerId).then(); 
         return { ...a, net_votes: newNet };
       }
@@ -251,7 +226,6 @@ export default function QuestionDetailPage() {
           <ArrowLeft size={20} className="mr-2" /> Back to Bank
         </button>
 
-        {/* Question Header */}
         <div className="bg-zinc-900 border border-zinc-800 p-8 mb-8 relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-red-600 to-pink-600"></div>
           
@@ -292,7 +266,6 @@ export default function QuestionDetailPage() {
           </div>
         </div>
 
-        {/* Answer Input Section */}
         <div className="bg-black border border-zinc-800 p-6 mb-10 shadow-lg">
             <h3 className="text-sm font-black uppercase tracking-widest text-zinc-500 mb-4">Contribute Solution</h3>
             <textarea 
@@ -325,7 +298,6 @@ export default function QuestionDetailPage() {
             </div>
         </div>
 
-        {/* Answers List */}
         <div className="space-y-6">
           <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2 text-white">
             Community Solutions <span className="bg-zinc-800 text-zinc-400 text-xs px-2 py-1 rounded-full">{answers.length}</span>
@@ -336,7 +308,6 @@ export default function QuestionDetailPage() {
             
             return (
                 <div key={ans.id} className="flex gap-4 border-l-2 border-zinc-800 pl-4 py-4 hover:border-red-900/50 transition-colors">
-                {/* Vote Controls */}
                 <div className="flex flex-col items-center gap-1 min-w-[32px] pt-1">
                     <button 
                         onClick={() => handleVote(ans.id, 1)} 
@@ -355,7 +326,6 @@ export default function QuestionDetailPage() {
                     </button>
                 </div>
 
-                {/* Answer Content */}
                 <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                         <div className="bg-zinc-800 p-1 rounded-full"><User size={12} className="text-zinc-400"/></div>

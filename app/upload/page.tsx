@@ -7,12 +7,10 @@ import {
   Upload, FileText, CheckCircle, Edit2, Loader2, Save, Trash2, X, Eye, ImageIcon
 } from 'lucide-react';
 
-// --- CONFIGURATION ---
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- HELPER COMPONENTS ---
 
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,12 +66,10 @@ const PublishModal = ({ isOpen, onClose, onConfirm }: any) => {
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   
-  // Cache for subjects to avoid refetching
   const subjectsCache = useRef<Record<string, string[]>>({});
 
   useEffect(() => {
     if (meta.year) {
-      // Check cache first
       if (subjectsCache.current[meta.year]) {
         setAvailableSubjects(subjectsCache.current[meta.year]);
         return;
@@ -93,7 +89,6 @@ const PublishModal = ({ isOpen, onClose, onConfirm }: any) => {
   }, [meta.year]);
 
   const handleConfirm = () => {
-    // If "Other" is selected, pass the custom subject name
     const finalSubject = meta.subject === 'Other' ? customSubject : meta.subject;
     onConfirm({ ...meta, subject: finalSubject, isCustomSubject: meta.subject === 'Other' });
   };
@@ -130,7 +125,6 @@ const PublishModal = ({ isOpen, onClose, onConfirm }: any) => {
               <option value="Other" className="text-amber-500 font-bold">+ Add New Subject</option>
             </select>
             
-            {/* Custom Subject Input */}
             {meta.subject === 'Other' && (
                 <input 
                     type="text" 
@@ -256,7 +250,7 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
 };
 
 export default function UploadPage() {
-  const [view, setView] = useState('upload'); // upload | processing | review
+  const [view, setView] = useState('upload'); 
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -275,9 +269,7 @@ export default function UploadPage() {
 
   const handlePublish = async (meta: any) => {
     try {
-        // 1. HANDLE NEW SUBJECT (If "Other" was selected)
         if (meta.isCustomSubject) {
-            // Check if subject already exists (case-insensitive)
             const { data: existingSubs } = await supabase
                 .from('subjects')
                 .select('id')
@@ -294,12 +286,11 @@ export default function UploadPage() {
             }
         }
 
-        // 2. DUPLICATE PAPER CHECK
         const { data: existingPaper, error: checkError } = await supabase
             .from('papers')
             .select('id')
             .eq('academic_year', meta.year)
-            .ilike('subject', meta.subject) // Loose match for safety
+            .ilike('subject', meta.subject) 
             .eq('exam_type', meta.exam)
             .eq('exam_year', meta.date)
             .maybeSingle();
@@ -311,7 +302,6 @@ export default function UploadPage() {
             return;
         }
 
-        // 3. INSERT PAPER
         const { data: paperData, error: paperError } = await supabase.from('papers').insert({
             academic_year: meta.year,
             subject: meta.subject,
@@ -321,7 +311,6 @@ export default function UploadPage() {
 
         if (paperError) throw paperError;
 
-        // 4. INSERT QUESTIONS
         const questionsToInsert = questions.map(q => ({
             paper_id: paperData.id,
             question_number: q.number,
@@ -341,7 +330,7 @@ export default function UploadPage() {
     }
   };
 
-  // --- Views ---
+
 
   if (view === 'processing') {
     if (uploadedFile && questions.length === 0) {

@@ -5,21 +5,18 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js'; 
 import { Filter, Search, Star, ArrowRight, Loader2, Image as ImageIcon } from 'lucide-react';
 
-// --- CONFIGURATION ---
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- GLOBAL CACHE (Persists across navigation) ---
 let feedCache = {
-  queryKey: '', // Stores the unique combination of filters
+  queryKey: '', 
   data: [] as any[],
   page: 0,
   hasMore: true,
   scrollPos: 0
 };
 
-// --- HELPER COMPONENTS ---
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -72,7 +69,6 @@ export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Initialize filters from URL
   const [filters, setFilters] = useState({ 
     year: searchParams.get('year') || '', 
     subject: searchParams.get('subject') || '', 
@@ -88,7 +84,6 @@ export default function Home() {
   const [hasSearched, setHasSearched] = useState(false);
   const ITEMS_PER_PAGE = 10;
 
-  // 1. Fetch available subjects when Year changes
   useEffect(() => {
     if (filters.year) {
         supabase.from('subjects').select('subject_name').eq('academic_year', filters.year)
@@ -96,21 +91,17 @@ export default function Home() {
     }
   }, [filters.year]);
 
-  // 2. Main Data Fetching Logic
   const fetchQuestions = useCallback(async (currentFilters: any, isNewSearch = false) => {
-    // Unique key for cache
     const queryKey = JSON.stringify(currentFilters);
 
-    // CACHE HIT CHECK
-    // If it's a "new search" (page load) AND matches our cache -> Load from Memory
+
     if (isNewSearch && feedCache.queryKey === queryKey && feedCache.data.length > 0) {
         console.log("⚡️ Restoring from Cache (No DB Call)");
         setDisplayQuestions(feedCache.data);
         setPage(feedCache.page);
         setHasMore(feedCache.hasMore);
         setHasSearched(true);
-        // Optional: Restore scroll position
-        // window.scrollTo(0, feedCache.scrollPos);
+   
         return;
     }
 
@@ -147,7 +138,6 @@ export default function Home() {
             setPage(1);
             setHasSearched(true);
             
-            // Update Cache (Reset)
             feedCache = {
                 queryKey,
                 data: formatted,
@@ -160,7 +150,6 @@ export default function Home() {
             setDisplayQuestions(newData);
             setPage(prev => prev + 1);
             
-            // Update Cache (Append)
             feedCache.data = newData;
             feedCache.page = page + 1;
         }
@@ -172,7 +161,6 @@ export default function Home() {
     setIsLoading(false);
   }, [page, displayQuestions]);
 
-  // 3. Sync URL with State (Runs on Mount & URL Change)
   useEffect(() => {
     const urlFilters = {
         year: searchParams.get('year') || '',
@@ -181,27 +169,21 @@ export default function Home() {
         date: searchParams.get('date') || ''
     };
     
-    // Update local inputs to match URL
     setFilters(urlFilters);
 
-    // Trigger fetch if valid filters exist
     if (urlFilters.year || urlFilters.subject || urlFilters.exam || urlFilters.date) {
         fetchQuestions(urlFilters, true);
     }
-  }, [searchParams]); // Dependency ensures this runs when back button is clicked
+  }, [searchParams]); 
 
-  // 4. Interaction Handlers
   const handleSearchClick = () => {
-    // Force a cache bust on manual search button click if needed, 
-    // or just let the URL change handle it.
-    // feedCache.queryKey = ''; // Uncomment to force refresh on button click
+   
     updateUrl(filters);
   };
 
   const handleTagClick = (e: React.MouseEvent, key: string, val: string) => {
     e.stopPropagation();
     
-    // Reset all filters and only set the clicked one
     const newFilters = {
         year: '',
         subject: '',
@@ -224,12 +206,10 @@ export default function Home() {
   };
 
   const navigateToDetail = (id: string) => {
-    // Save scroll position before leaving
     feedCache.scrollPos = window.scrollY;
     router.push(`/question/${id}`);
   };
 
-  // Styles
   const styles = {
     input: "bg-zinc-900 border border-zinc-700 p-3 text-white placeholder-zinc-500 focus:border-red-600 outline-none w-full transition-colors font-mono text-sm",
     btnPrimary: "bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold px-6 py-2 hover:opacity-90 active:scale-95 transition-transform uppercase tracking-wider text-xs flex justify-center items-center gap-2",
@@ -238,7 +218,6 @@ export default function Home() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      {/* Filter Bar */}
       <div className="bg-black border border-zinc-800 p-6 mb-8 sticky top-20 z-40 shadow-2xl shadow-black">
         <div className="flex items-center gap-2 mb-4 text-red-500 text-xs font-bold uppercase tracking-widest">
             <Filter size={14} /> Query Bank
@@ -264,7 +243,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Feed Results */}
       <div className="space-y-4 min-h-[50vh]">
         {!hasSearched && !isLoading && (
           <div className="flex flex-col items-center justify-center h-64 text-zinc-600">
@@ -287,12 +265,10 @@ export default function Home() {
             </div>
             
             <div className="flex gap-4">
-                {/* Question Number (Left Side) */}
                 <div className="shrink-0 w-12 pt-1 border-r border-zinc-800 mr-2">
                     <span className="text-zinc-500 font-black text-lg block">Q{q.question_number}</span>
                 </div>
 
-                {/* Content */}
                 <div className="flex-1 min-w-0">
                     <div className="text-gray-300 text-sm font-light leading-relaxed mb-4">
                     <LatexRenderer text={q.content} />
