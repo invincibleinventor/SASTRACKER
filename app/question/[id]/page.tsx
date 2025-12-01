@@ -53,7 +53,7 @@ const LatexRenderer = ({ text }: { text: string }) => {
     }
   }, [text, isLoaded]);
 
-  return <div ref={containerRef} className="latex-content inline-block w-full break-words" />;
+  return <div ref={containerRef} className="latex-content hide-scrollbar overflow-x-auto inline-block w-full break-words" />;
 };
 
 export default function QuestionDetailPage() {

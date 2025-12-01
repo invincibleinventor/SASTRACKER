@@ -17,7 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`lg:pb-20 min-h-screen bg-neutral-950 space-mono-regular`}
+        className={`lg:pb-20 h-full lg:min-h-screen bg-neutral-950 space-mono-regular`}
       >
   <Nav></Nav>
         {children}

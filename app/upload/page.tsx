@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  Upload, FileText, CheckCircle, Edit2, Loader2, Save, Trash2, X, Eye, ImageIcon
+  Upload, FileText, CheckCircle, Edit2, Loader2, Save, Trash2, X, Eye, ImageIcon,
+  AlertTriangle
 } from 'lucide-react';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 
@@ -56,7 +57,7 @@ const LatexRenderer = ({ text }: { text: string }) => {
     }
   }, [text, isLoaded]);
 
-  return <div ref={containerRef} className="latex-content inline-block w-full break-words" />;
+  return <div ref={containerRef} className="latex-content hide-scrollbar overflow-x-auto inline-block w-full break-words" />;
 };
 
 const PublishModal = ({ isOpen, onClose, onConfirm }: any) => {
@@ -403,7 +404,7 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 animate-in fade-in zoom-in duration-500">
+    <div className="flex flex-col items-center justify-center min-h-screen p-6 animate-in fade-in zoom-in duration-500">
       <div className="text-center mb-12">
         <h1 className="text-5xl font-black text-white mb-4 uppercase tracking-tighter">
           UPLOAD <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-pink-600">PYQS</span>
@@ -423,6 +424,11 @@ export default function UploadPage() {
         />
         <Upload size={48} className="mb-6 text-zinc-500 group-hover:text-red-500 transition-colors" />
         <h3 className="text-xl font-bold text-white uppercase tracking-widest mb-2">Drop PDF Here</h3>
+      
+      <div className="mt-6 flex items-center gap-2 text-zinc-500 text-xs font-mono border border-zinc-800 px-3 py-1 rounded-full bg-zinc-900/50">
+         <AlertTriangle size={12} className="text-amber-500" />
+         <span>Max File Size: 4.5MB (Beta Limit)</span>
+      </div>
       </div>
     </div>
   );

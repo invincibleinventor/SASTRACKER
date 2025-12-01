@@ -9,6 +9,15 @@
   font-style: normal;
 }
 
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;             /* Chrome, Safari, Edge (WebKit) */
+}
+
 .space-mono-bold {
   font-family: "Space Mono", monospace;
   font-weight: 700;
