@@ -1,41 +1,96 @@
 "use client"
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+
 import { Lock, ShieldAlert, Loader2 } from 'lucide-react';
 import Logo from '@/components/Logo';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
-
+// Allowed domains (same as middleware)
+  const allowedDomains = [
+    "@sastra.ac.in",
+    "@it.sastra.edu",
+    "@cse.sastra.edu",
+    "@soc.sastra.edu",
+  ];
 export default function AuthPage() {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
 
 
   
+  // Run on mount: detect invalid_domain flag or an already-signed-in user with invalid email
+  useEffect(() => {
+    async function check() {
+      const invalidDomainFlag = searchParams.get('invalid_domain');
+
+      // If middleware redirected here due to invalid domain -> sign out to clear cookies
+      if (invalidDomainFlag === '1') {
+        setError("Your email is not from the allowed SASTRA domains. Signing you out...");
+        await supabase.auth.signOut();
+        // keep the user on the auth page so they can login with another account
+        return;
+      }
+
+      // No invalid_domain flag — check if user is already signed in
+      const { data: { session }, error: sessErr } = await supabase.auth.getSession();
+
+      if (sessErr) {
+        // don't block the page; show error if useful
+        console.error("Session error:", sessErr);
+      }
+
+      const user = session?.user ?? null;
+      if (!user) {
+        // not signed in -> show normal UI
+        return;
+      }
+
+      // if signed in, check domain validity
+      const email = (user.email ?? '').toLowerCase().trim();
+      const isAllowed = allowedDomains.some(d => email.endsWith(d));
+
+      if (!isAllowed) {
+        setError("Your current account email is not allowed. Signing out...");
+        await supabase.auth.signOut();
+        return;
+      }
+
+      // signed in and valid -> redirect to home
+      router.replace('/');
+    }
+
+    check();
+    // searchParams is stable enough here
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError("");
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      // IMPORTANT: redirect to /auth so the client can handle session + domain checks after OAuth
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: `${window.location.origin}/auth`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
           }
         }
       });
-      
-      if (error) throw error;
+
+      if (oauthError) throw oauthError;
+      // After calling signInWithOAuth the browser will redirect to Google's consent page
     } catch (err: any) {
-      setError(err.message);
+      setError(err?.message || "Login failed");
       setLoading(false);
     }
   };
