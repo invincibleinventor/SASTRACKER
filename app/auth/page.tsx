@@ -5,9 +5,10 @@ import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { Lock, ShieldAlert, Loader2 } from 'lucide-react';
 import Logo from '@/components/Logo';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-const supabase = createClientComponentClient();
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function AuthPage() {
   const [loading, setLoading] = useState(false);
@@ -24,7 +25,7 @@ export default function AuthPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

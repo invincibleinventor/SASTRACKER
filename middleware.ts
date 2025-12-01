@@ -4,76 +4,54 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
-  const path = req.nextUrl.pathname
+  const supabase = createMiddlewareClient({ req, res })
 
-  // 1. BYPASS MIDDLEWARE FOR AUTH CALLBACK
-  // This allows the route handler to exchange the code for a session without interference
-  if (path === '/auth/callback') {
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const pathname = req.nextUrl.pathname
+
+  const allowedDomains = [
+    "@sastra.ac.in",
+    "@it.sastra.edu",
+    "@cse.sastra.edu",
+    "@soc.sastra.edu",
+  ]
+
+  const isAuthPage = pathname.startsWith("/auth")
+
+  // 🔥 1. If user NOT logged in → only /auth is allowed
+  if (!user) {
+    if (!isAuthPage) {
+      const url = req.nextUrl.clone()
+      url.pathname = "/auth"
+      return NextResponse.redirect(url)
+    }
     return res
   }
 
-  const supabase = createMiddlewareClient({ req, res })
+  // 🔥 2. If logged in but email not valid → logout + redirect to /auth
+  const email = user.email?.toLowerCase() || ""
 
-  // Refresh session if possible
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const isValidEmail = allowedDomains.some(domain =>
+    email.endsWith(domain)
+  )
 
-  // 2. Unauthenticated Users
-  if (!user) {
-    // Allow access to login page
-    if (path.startsWith('/auth')) {
-      return res
-    }
-    
-    // Redirect ANY other route to /auth
-    const redirectUrl = req.nextUrl.clone()
-    redirectUrl.pathname = '/auth'
-    return NextResponse.redirect(redirectUrl)
+  if (!isValidEmail) {
+    // Force logout
+    await supabase.auth.signOut()
+
+    const url = req.nextUrl.clone()
+    url.pathname = "/auth"
+    return NextResponse.redirect(url)
   }
 
-  // 3. Authenticated Users
-  if (user) {
-    // Prevent logged-in users from accessing the login page
-    if (path === '/auth') {
-      const redirectUrl = req.nextUrl.clone()
-      redirectUrl.pathname = '/'
-      return NextResponse.redirect(redirectUrl)
-    }
-
-    // Domain Enforcement
-    if (user.email) {
-      const allowedDomains = [
-        'sastra.ac.in',
-        'it.sastra.edu',
-        'ict.sastra.edu',
-        'soc.sastra.edu',
-        'cse.sastra.edu'
-      ];
-
-      const email = user.email.toLowerCase();
-      const isAllowed = allowedDomains.some(domain => email.endsWith(`@${domain}`));
-
-      if (!isAllowed) {
-        // Sign out and redirect
-        const redirectUrl = req.nextUrl.clone()
-        redirectUrl.pathname = '/auth'
-        redirectUrl.searchParams.set('error', 'Unauthorized Domain. Please use a SASTRA email.')
-        
-        const response = NextResponse.redirect(redirectUrl)
-        const supabaseSignOut = createMiddlewareClient({ req, res: response })
-        await supabaseSignOut.auth.signOut()
-        
-        return response
-      }
-    }
-  }
-
+  // User authenticated + email valid → allow request
   return res
 }
 
 export const config = {
   matcher: [
+    // Protect everything except static assets
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
