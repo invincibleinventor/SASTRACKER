@@ -337,7 +337,7 @@ export default function UploadPage() {
          try {
             const formData = new FormData();
             formData.append('file', uploadedFile);
-            const res = await fetch(process.env.SERVER=='local' ? 'http://localhost:8000/extract' : 'http://sastrackerbackend.vercel.app/extract', { method: 'POST', body: formData });
+            const res = await fetch(process.env.SERVER=='local' ? 'http://localhost:8000/extract' : 'https://sastrackerbackend.vercel.app/extract', { method: 'POST', body: formData });
             if (!res.ok) throw new Error("Backend Error");
             const data = await res.json();
             const mapped = data.questions.map((q: any) => ({
