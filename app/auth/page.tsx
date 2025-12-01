@@ -49,7 +49,7 @@ export default function AuthPage() {
             SASTRACKER<span className="text-red-600">.</span>
           </h1>
           <p className="text-zinc-500 text-xs font-mono mt-2 uppercase tracking-widest">
-           The Ultimate Question Bank
+           The Missing Search Engine For PyQs
           </p>
         </div>
 

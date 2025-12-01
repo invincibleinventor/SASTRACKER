@@ -75,6 +75,7 @@ export default function Home() {
     exam: searchParams.get('exam') || '', 
     date: searchParams.get('date') || '' 
   });
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
 
   const [displayQuestions, setDisplayQuestions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -91,45 +92,58 @@ export default function Home() {
     }
   }, [filters.year]);
 
-  const fetchQuestions = useCallback(async (currentFilters: any, isNewSearch = false) => {
-    const queryKey = JSON.stringify(currentFilters);
-
+  const fetchQuestions = useCallback(async (currentFilters: any, currentQuery: string, isNewSearch = false) => {
+    const queryKey = JSON.stringify({ ...currentFilters, q: currentQuery });
 
     if (isNewSearch && feedCache.queryKey === queryKey && feedCache.data.length > 0) {
-        console.log("⚡️ Restoring from Cache (No DB Call)");
+        console.log("⚡️ Restoring from Cache");
         setDisplayQuestions(feedCache.data);
         setPage(feedCache.page);
         setHasMore(feedCache.hasMore);
         setHasSearched(true);
-   
+
         return;
     }
 
-    if (!currentFilters.year && !currentFilters.subject && !currentFilters.exam && !currentFilters.date) return;
+    if (!currentQuery && !currentFilters.year && !currentFilters.subject && !currentFilters.exam && !currentFilters.date) return;
 
     setIsLoading(true);
     const currentPage = isNewSearch ? 0 : page;
     const from = currentPage * ITEMS_PER_PAGE;
     const to = from + ITEMS_PER_PAGE - 1;
 
-    let query = supabase.from('questions')
-        .select(`*, papers!inner (academic_year, subject, exam_type, exam_year)`)
-        .range(from, to);
+    let data: any[] | null = [];
+    let error: any = null;
 
-    if (currentFilters.year) query = query.eq('papers.academic_year', currentFilters.year);
-    if (currentFilters.subject) query = query.ilike('papers.subject', `%${currentFilters.subject}%`);
-    if (currentFilters.exam) query = query.eq('papers.exam_type', currentFilters.exam);
-    if (currentFilters.date) query = query.eq('papers.exam_year', currentFilters.date);
+    if (currentQuery) {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('search_questions', { keyword: currentQuery });
+        if (rpcData) {
+            data = rpcData.slice(from, to + 1); 
+            if (rpcData.length <= to) setHasMore(false);
+        }
+        error = rpcError;
+    } else {
+        let query = supabase.from('questions')
+            .select(`*, papers!inner (academic_year, subject, exam_type, exam_year)`)
+            .range(from, to);
 
-    const { data, error } = await query;
+        if (currentFilters.year) query = query.eq('papers.academic_year', currentFilters.year);
+        if (currentFilters.subject) query = query.ilike('papers.subject', `%${currentFilters.subject}%`);
+        if (currentFilters.exam) query = query.eq('papers.exam_type', currentFilters.exam);
+        if (currentFilters.date) query = query.eq('papers.exam_year', currentFilters.date);
+
+        const res = await query;
+        data = res.data;
+        error = res.error;
+    }
 
     if (!error && data) {
-        const formatted = data.map(q => ({
+        const formatted = data.map((q: any) => ({
             ...q,
-            academic_year: q.papers.academic_year,
-            subject: q.papers.subject,
-            exam_type: q.papers.exam_type,
-            exam_year: q.papers.exam_year,
+            academic_year: q.academic_year || q.papers?.academic_year,
+            subject: q.subject || q.papers?.subject,
+            exam_type: q.exam_type || q.papers?.exam_type,
+            exam_year: q.exam_year || q.papers?.exam_year,
             avg_rating: q.avg_rating || 0
         }));
 
@@ -154,9 +168,11 @@ export default function Home() {
             feedCache.page = page + 1;
         }
         
-        const moreAvailable = data.length === ITEMS_PER_PAGE;
-        setHasMore(moreAvailable);
-        feedCache.hasMore = moreAvailable;
+        if (!currentQuery) {
+            const moreAvailable = data.length === ITEMS_PER_PAGE;
+            setHasMore(moreAvailable);
+            feedCache.hasMore = moreAvailable;
+        }
     }
     setIsLoading(false);
   }, [page, displayQuestions]);
@@ -168,17 +184,31 @@ export default function Home() {
         exam: searchParams.get('exam') || '',
         date: searchParams.get('date') || ''
     };
+    const q = searchParams.get('q') || '';
     
     setFilters(urlFilters);
+    setSearchQuery(q);
 
-    if (urlFilters.year || urlFilters.subject || urlFilters.exam || urlFilters.date) {
-        fetchQuestions(urlFilters, true);
+    if (q || urlFilters.year || urlFilters.subject || urlFilters.exam || urlFilters.date) {
+        fetchQuestions(urlFilters, q, true);
     }
-  }, [searchParams]); 
+  }, [searchParams]);
+
+  const updateUrl = (newFilters: any, queryStr: string) => {
+    const params = new URLSearchParams();
+    if (queryStr) {
+        params.set('q', queryStr);
+    } else {
+        if (newFilters.year) params.set('year', newFilters.year);
+        if (newFilters.subject) params.set('subject', newFilters.subject);
+        if (newFilters.exam) params.set('exam', newFilters.exam);
+        if (newFilters.date) params.set('date', newFilters.date);
+    }
+    router.push(`/?${params.toString()}`);
+  };
 
   const handleSearchClick = () => {
-   
-    updateUrl(filters);
+    updateUrl(filters, searchQuery);
   };
 
   const handleTagClick = (e: React.MouseEvent, key: string, val: string) => {
@@ -193,16 +223,8 @@ export default function Home() {
     };
     
     setFilters(newFilters);
-    updateUrl(newFilters);
-  };
-
-  const updateUrl = (newFilters: any) => {
-    const params = new URLSearchParams();
-    if (newFilters.year) params.set('year', newFilters.year);
-    if (newFilters.subject) params.set('subject', newFilters.subject);
-    if (newFilters.exam) params.set('exam', newFilters.exam);
-    if (newFilters.date) params.set('date', newFilters.date);
-    router.push(`/?${params.toString()}`);
+    setSearchQuery(''); 
+    updateUrl(newFilters, '');
   };
 
   const navigateToDetail = (id: string) => {
@@ -216,21 +238,21 @@ export default function Home() {
     tag: "cursor-pointer bg-zinc-900 border border-zinc-700 text-zinc-400 px-2 py-1 text-[10px] uppercase hover:bg-zinc-800 hover:text-red-400 hover:border-red-900 transition-colors flex items-center gap-1"
   };
 
-
-
-    useEffect(() => {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session) router.push('/auth');
-      });
-    }, [router]);
-
-    
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="bg-black border border-zinc-800 p-6 mb-8 sticky top-20 z-40 shadow-2xl shadow-black">
-        <div className="flex items-center gap-2 mb-4 text-red-500 text-xs font-bold uppercase tracking-widest">
-            <Filter size={14} /> Query Bank
+        <div className="mb-6 relative">
+            <input 
+                type="text" 
+                className="w-full bg-zinc-900 border border-zinc-700 p-4 pl-12 text-white placeholder-zinc-500 focus:border-red-600 outline-none transition-colors"
+                placeholder="Search across all questions (e.g., 'Resultant', 'Routhe Array')..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearchClick()}
+            />
+            <Search className="absolute left-4 top-4 text-zinc-500" size={20} />
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <select className={styles.input} value={filters.year} onChange={e => setFilters({...filters, year: e.target.value, subject: ''})}>
             <option value="">Year...</option>
@@ -248,7 +270,7 @@ export default function Home() {
             {['CIA - 1', 'CIA - 2', 'CIA - 3', 'End Sem', 'Lab Cia', 'End Sem Lab'].map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           <input type="number" className={styles.input} placeholder="Year" value={filters.date} onChange={e => setFilters({...filters, date: e.target.value})} />
-          <button onClick={handleSearchClick} className={styles.btnPrimary}><Search size={14}/> Search</button>
+          <button onClick={handleSearchClick} className={styles.btnPrimary+' h-full'}><Search size={14}/> Find</button>
         </div>
       </div>
 
@@ -256,7 +278,7 @@ export default function Home() {
         {!hasSearched && !isLoading && (
           <div className="flex flex-col items-center justify-center h-64 text-zinc-600">
             <Search size={48} className="mb-4 opacity-20" />
-            <p className="text-sm font-mono uppercase">Select Filters and click Search</p>
+            <p className="text-sm font-mono uppercase">Select Filters or Search</p>
           </div>
         )}
 
@@ -311,7 +333,7 @@ export default function Home() {
         
         {displayQuestions.length > 0 && hasMore && (
             <div className="flex justify-center pt-8">
-                <button onClick={() => fetchQuestions(filters, false)} className="flex items-center gap-2 text-zinc-500 hover:text-white text-xs uppercase font-bold transition-colors" disabled={isLoading}>
+                <button onClick={() => fetchQuestions(filters, searchQuery, false)} className="flex items-center gap-2 text-zinc-500 hover:text-white text-xs uppercase font-bold transition-colors" disabled={isLoading}>
                     {isLoading ? <Loader2 size={16} className="animate-spin" /> : "Load More"}
                 </button>
             </div>

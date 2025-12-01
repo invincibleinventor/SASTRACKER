@@ -5,7 +5,7 @@ import Nav from "@/components/Nav";
 
 
 export const metadata: Metadata = {
-  title: "SASTRACKER - PyQDB",
+  title: "SASTRACKER - The Missing Search Engine For PyQs",
   description: "A Database of PyQs for SASTRA Students",
 };
 
