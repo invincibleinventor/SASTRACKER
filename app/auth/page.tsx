@@ -6,10 +6,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { Lock, ShieldAlert, Loader2 } from 'lucide-react';
 import Logo from '@/components/Logo';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+const supabase = createPagesBrowserClient();
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 // Allowed domains (same as middleware)
   const allowedDomains = [
     "@sastra.ac.in",

@@ -1,15 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { 
   Upload, FileText, CheckCircle, Edit2, Loader2, Save, Trash2, X, Eye, ImageIcon
 } from 'lucide-react';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+
+const supabase = createPagesBrowserClient();
 
 
 const LatexRenderer = ({ text }: { text: string }) => {
