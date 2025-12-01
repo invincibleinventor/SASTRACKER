@@ -4,6 +4,14 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
+  const path = req.nextUrl.pathname
+
+  // 1. BYPASS MIDDLEWARE FOR AUTH CALLBACK
+  // This allows the route handler to exchange the code for a session without interference
+  if (path === '/auth/callback') {
+    return res
+  }
+
   const supabase = createMiddlewareClient({ req, res })
 
   // Refresh session if possible
@@ -11,11 +19,9 @@ export async function middleware(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const path = req.nextUrl.pathname
-
-  // 1. Unauthenticated Users
+  // 2. Unauthenticated Users
   if (!user) {
-    // Allow access to login page and auth callbacks (e.g. /auth/callback)
+    // Allow access to login page
     if (path.startsWith('/auth')) {
       return res
     }
@@ -26,10 +32,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
-  // 2. Authenticated Users
+  // 3. Authenticated Users
   if (user) {
     // Prevent logged-in users from accessing the login page
-    // We check for exactly '/auth' to allow '/auth/callback' to process if needed
     if (path === '/auth') {
       const redirectUrl = req.nextUrl.clone()
       redirectUrl.pathname = '/'
