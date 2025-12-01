@@ -216,6 +216,15 @@ export default function Home() {
     tag: "cursor-pointer bg-zinc-900 border border-zinc-700 text-zinc-400 px-2 py-1 text-[10px] uppercase hover:bg-zinc-800 hover:text-red-400 hover:border-red-900 transition-colors flex items-center gap-1"
   };
 
+
+
+    useEffect(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) router.push('/auth');
+      });
+    }, [router]);
+
+    
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="bg-black border border-zinc-800 p-6 mb-8 sticky top-20 z-40 shadow-2xl shadow-black">
