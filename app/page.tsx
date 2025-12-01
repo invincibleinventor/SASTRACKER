@@ -238,11 +238,11 @@ export default function Home() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <div className="bg-black border border-zinc-800 p-6 mb-8 sticky top-20 z-40 shadow-2xl shadow-black">
+      <div className="bg-black border border-zinc-800 p-6 mb-8 lg:sticky top-20 z-40 shadow-2xl shadow-black">
         <div className="mb-6 relative">
             <input 
                 type="text" 
-                className="w-full bg-zinc-900 border border-zinc-700 p-4 pl-12 text-white placeholder-zinc-500 focus:border-red-600 outline-none transition-colors"
+                className="w-full lg:text-base text-sm bg-zinc-900 border border-zinc-700 p-4 pl-12 text-white placeholder-zinc-500 focus:border-red-600 outline-none transition-colors"
                 placeholder="Search across all questions (e.g., 'Resultant', 'Routhe Array')..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
