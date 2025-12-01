@@ -2,12 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js'; 
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Filter, Search, Star, ArrowRight, Loader2, Image as ImageIcon } from 'lucide-react';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 let feedCache = {
   queryKey: '', 
@@ -66,6 +63,8 @@ const LatexRenderer = ({ text }: { text: string }) => {
 };
 
 export default function Home() {
+    const supabase = createClientComponentClient();
+
   const router = useRouter();
   const searchParams = useSearchParams();
   

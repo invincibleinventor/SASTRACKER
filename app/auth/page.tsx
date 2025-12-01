@@ -1,19 +1,21 @@
-"use client";
+"use client"
 
 import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { Lock, ShieldAlert, Loader2 } from 'lucide-react';
 import Logo from '@/components/Logo';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClientComponentClient();
 
 export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+
+
+  
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -22,11 +24,10 @@ export default function AuthPage() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`, 
+          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
-            hd: 'sastra.ac.in' 
           }
         }
       });
@@ -44,7 +45,7 @@ export default function AuthPage() {
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-pink-600"></div>
         
         <div className="mb-8 text-center">
-          <div className='ml-auto my-4'><Logo></Logo></div>
+          <div className='flex justify-center mb-4'><Logo /></div>
           <h1 className="text-3xl font-black text-white uppercase tracking-tighter">
             SASTRACKER<span className="text-red-600">.</span>
           </h1>
@@ -67,8 +68,10 @@ export default function AuthPage() {
                 SASTRA Access Only
               </h3>
               <p className="text-amber-700/80 text-[10px] leading-relaxed">
-                Restricted to SASTRA Deemed University. Sign in with your official{' '}
-                <span className="text-amber-500 font-mono">@sastra.ac.in</span> email address.
+                Restricted to SASTRA Deemed University. Sign in with your official email: <br/>
+                <span className="block mt-1 font-mono text-amber-500">
+                  @sastra.ac.in
+                </span>
               </p>
             </div>
           </div>
@@ -97,3 +100,4 @@ export default function AuthPage() {
     </div>
   );
 }
+
