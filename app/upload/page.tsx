@@ -8,7 +8,9 @@ import {
 } from 'lucide-react';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 
+
 const supabase = createPagesBrowserClient();
+
 
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -18,10 +20,10 @@ const LatexRenderer = ({ text }: { text: string }) => {
     if ((window as any).katex) { setIsLoaded(true); return; }
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css)";
+    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
     document.head.appendChild(link);
     const script = document.createElement("script");
-    script.src = "[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js)";
+    script.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js";
     script.onload = () => setIsLoaded(true);
     document.head.appendChild(script);
   }, []);
@@ -77,7 +79,7 @@ const PublishModal = ({ isOpen, onClose, onConfirm }: any) => {
       supabase.from('subjects').select('subject_name').eq('academic_year', meta.year)
         .then(({ data }) => {
           const subjects = data ? data.map(s => s.subject_name) : [];
-          subjectsCache.current[meta.year] = subjects; 
+          subjectsCache.current[meta.year] = subjects; // Update cache
           setAvailableSubjects(subjects);
           setLoadingSubjects(false);
         });
@@ -250,26 +252,38 @@ export default function UploadPage() {
   const [questions, setQuestions] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
+  const [server,setServers] = useState('prod');
+
+  // Store user in state so we can use it in handlePublish
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
+    setServers(process.env.NEXT_PUBLIC_SERVER || 'prod');
     supabase.auth.getSession().then(({ data: { session } }: any) => {
-      if (!session) router.push('/auth');
+      if (!session) {
+          router.push('/auth');
+      } else {
+          setUser(session.user);
+      }
     });
   }, [router]);
 
   const handleUpload = (file: File) => {
-    if (file.size > 4.5 * 1024 * 1024) {
-      alert(`File too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Max size is 4.5MB.`);
-      return;
-    }
     setUploadedFile(file);
     setView('processing');
   };
 
   const handlePublish = async (meta: any) => {
     try {
+        if (!user) return; // Safety check
+
         if (meta.isCustomSubject) {
-            const { data: existingSubs } = await supabase.from('subjects').select('id').ilike('subject_name', meta.subject).maybeSingle();
+            const { data: existingSubs } = await supabase
+                .from('subjects')
+                .select('id')
+                .ilike('subject_name', meta.subject)
+                .maybeSingle();
+            
             if (!existingSubs) {
                 const { error: subError } = await supabase.from('subjects').insert({
                     academic_year: meta.year,
@@ -283,7 +297,7 @@ export default function UploadPage() {
             .from('papers')
             .select('id')
             .eq('academic_year', meta.year)
-            .ilike('subject', meta.subject)
+            .ilike('subject', meta.subject) 
             .eq('exam_type', meta.exam)
             .eq('exam_year', meta.date)
             .maybeSingle();
@@ -295,11 +309,13 @@ export default function UploadPage() {
             return;
         }
 
+        // Insert paper WITH user_id
         const { data: paperData, error: paperError } = await supabase.from('papers').insert({
             academic_year: meta.year,
             subject: meta.subject,
             exam_type: meta.exam,
-            exam_year: meta.date
+            exam_year: meta.date,
+            user_id: user.id 
         }).select().single();
 
         if (paperError) throw paperError;
@@ -324,31 +340,20 @@ export default function UploadPage() {
     }
   };
 
+
+
   if (view === 'processing') {
     if (uploadedFile && questions.length === 0) {
        const extract = async () => {
          try {
-            // 1. Upload to Supabase Storage
-            const fileExt = uploadedFile.name.split('.').pop();
-            const fileName = `${Math.random()}.${fileExt}`;
-            const { error: uploadError } = await supabase.storage.from('raw-pdfs').upload(fileName, uploadedFile);
-            if (uploadError) throw new Error("Upload to Storage failed: " + uploadError.message);
-
-            const { data: urlData } = supabase.storage.from('raw-pdfs').getPublicUrl(fileName);
-            const publicUrl = urlData.publicUrl;
-
-            // 2. Send URL to Backend
-            const res = await fetch(process.env.SERVER=='local' ? 'http://localhost:8000/extract' : '[https://sastrackerbackend.vercel.app/extract](https://sastrackerbackend.vercel.app/extract)', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ file_url: publicUrl })
-            });
-            
+            const formData = new FormData();
+            formData.append('file', uploadedFile);
+            const res = await fetch(server=='local' ? 'http://localhost:8000/extract' : 'https://sastrackerbackend.vercel.app/extract', { method: 'POST', body: formData });
             if (!res.ok) throw new Error("Backend Error");
             const data = await res.json();
             const mapped = data.questions.map((q: any) => ({
                 ...q, verified: false, difficulty: 1, 
-                image: q.image_base64 || (q.hasImage ? "[https://placehold.co/600x200?text=Image+Detected](https://placehold.co/600x200?text=Image+Detected)" : null)
+                image: q.image_base64 || (q.hasImage ? "https://placehold.co/600x200?text=Image+Detected" : null)
             }));
             setQuestions(mapped);
             setView('review');

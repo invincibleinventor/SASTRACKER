@@ -9,12 +9,12 @@
   font-style: normal;
 }
 
-.hide-scrollbar {
+* {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;     /* Firefox */
 }
 
-.hide-scrollbar::-webkit-scrollbar {
+*::-webkit-scrollbar {
   display: none;             /* Chrome, Safari, Edge (WebKit) */
 }
 
@@ -40,3 +40,4 @@
 select {
     appearance :none !important;
 }
+

@@ -1,12 +1,11 @@
+'use client';
 
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
-import { ArrowLeft, Star, User, Clock, Send, Paperclip, ChevronUp, ChevronDown, Loader2, X, Info } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation'; 
+import { ArrowLeft, Star, User, Clock, Send, Paperclip, ChevronUp, ChevronDown, Loader2, X, Info, Trash2 } from 'lucide-react';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 const supabase = createPagesBrowserClient();
-
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -15,10 +14,10 @@ const LatexRenderer = ({ text }: { text: string }) => {
     if ((window as any).katex) { setIsLoaded(true); return; }
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css)";
+    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
     document.head.appendChild(link);
     const script = document.createElement("script");
-    script.src = "[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js)";
+    script.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js";
     script.onload = () => setIsLoaded(true);
     document.head.appendChild(script);
   }, []);
@@ -27,7 +26,8 @@ const LatexRenderer = ({ text }: { text: string }) => {
     if (!text || !containerRef.current) return;
     if (isLoaded) {
       try {
-        const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[\s\S]+?\$)/g);
+        // Updated Regex to support $...$, $$...$$, and `...`
+        const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[\s\S]+?\$|`[\s\S]+?`)/g);
         containerRef.current.innerHTML = '';
         parts.forEach(part => {
           if (part.startsWith('$$') && part.endsWith('$$')) {
@@ -36,6 +36,12 @@ const LatexRenderer = ({ text }: { text: string }) => {
              (window as any).katex.render(cleanMath, span, { displayMode: true, throwOnError: false }); 
              containerRef.current?.appendChild(span);
           } else if (part.startsWith('$') && part.endsWith('$')) {
+            const span = document.createElement('span');
+            const cleanMath = part.slice(1, -1).replace(/\\\\/g, '\\');
+            (window as any).katex.render(cleanMath, span, { throwOnError: false }); 
+            containerRef.current?.appendChild(span);
+          } else if (part.startsWith('`') && part.endsWith('`')) {
+            // Handle backticks as inline math (Common AI fallback)
             const span = document.createElement('span');
             const cleanMath = part.slice(1, -1).replace(/\\\\/g, '\\');
             (window as any).katex.render(cleanMath, span, { throwOnError: false }); 
@@ -54,7 +60,6 @@ const LatexRenderer = ({ text }: { text: string }) => {
 
   return <div ref={containerRef} className="latex-content hide-scrollbar overflow-x-auto inline-block w-full break-words" />;
 };
-
 export default function QuestionDetailPage() {
   const params = useParams();
   const id = params?.id as string;
@@ -135,7 +140,8 @@ export default function QuestionDetailPage() {
             content: newAnswer,
             author_name: user.email?.split('@')[0] || 'Anonymous', 
             image_url: imageUrl,
-            net_votes: 0 
+            net_votes: 0,
+            user_id: user.id // Added user_id
         }).select();
 
         if (error) throw error;
@@ -147,6 +153,17 @@ export default function QuestionDetailPage() {
         alert(`Failed to post: ${error.message}`);
     } finally {
         setUploading(false);
+    }
+  };
+
+  const handleDeleteAnswer = async (answerId: string) => {
+    if (!confirm("Delete your answer?")) return;
+    try {
+        const { error } = await supabase.from('answers').delete().eq('id', answerId);
+        if (error) throw error;
+        setAnswers(answers.filter(a => a.id !== answerId));
+    } catch (e) {
+        alert("Failed to delete answer.");
     }
   };
 
@@ -306,7 +323,7 @@ export default function QuestionDetailPage() {
           </h3>
 
           {answers.map(ans => {
-            const myVote = userVotes[ans.id] || 0; // 1, -1, or 0
+            const myVote = userVotes[ans.id] || 0; 
             
             return (
                 <div key={ans.id} className="flex gap-4 border-l-2 border-zinc-800 pl-4 py-4 hover:border-red-900/50 transition-colors">
@@ -329,10 +346,17 @@ export default function QuestionDetailPage() {
                 </div>
 
                 <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="bg-zinc-800 p-1 rounded-full"><User size={12} className="text-zinc-400"/></div>
-                        <span className="text-sm font-bold text-zinc-300">{ans.author_name}</span>
-                        <span className="text-xs text-zinc-600 flex items-center gap-1"><Clock size={10}/> {new Date(ans.created_at).toLocaleDateString()}</span>
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-zinc-800 p-1 rounded-full"><User size={12} className="text-zinc-400"/></div>
+                            <span className="text-sm font-bold text-zinc-300">{ans.author_name}</span>
+                            <span className="text-xs text-zinc-600 flex items-center gap-1"><Clock size={10}/> {new Date(ans.created_at).toLocaleDateString()}</span>
+                        </div>
+                        {user?.id === ans.user_id && (
+                           <button onClick={() => handleDeleteAnswer(ans.id)} className="text-zinc-600 hover:text-red-500 transition-colors" title="Delete">
+                             <Trash2 size={14} />
+                           </button>
+                        )}
                     </div>
                     <div className="text-zinc-400 text-sm leading-relaxed mb-3">
                         <LatexRenderer text={ans.content} />

@@ -65,13 +65,18 @@ export default function Navbar() {
           <div className="flex items-center gap-3">
             {user ? (
               <>
-                <span className="text-zinc-600 text-xs font-mono hidden md:block">{user.email}</span>
+              <Link href={'/dashboard'} className='flex flex-row items-center content-center gap-2'>
+              <img className='w-5 h-5 rounded-full' src={user.user_metadata?.avatar_url}></img>
+                <span className="text-zinc-400 text-xs font-medium hover:cursor-pointer font-mono hidden md:block">{user.email.substring(0, user.email.indexOf("@"))}</span>
+              </Link>
+                          <div className="h-4 ml-2 w-px bg-zinc-800"></div>
+
                 <button onClick={handleLogout} className="text-zinc-500 hover:text-red-500 transition-colors" title="Logout">
                   <LogOut size={16} />
                 </button>
               </>
             ) : (
-               <Link href="/auth" className="text-zinc-500 hover:text-white text-xs font-bold uppercase">Login</Link>
+               <Link href="/auth" className="text-zinc-300 hover:text-white text-xs font-bold uppercase">Login</Link>
             )}
           </div>
         </div>
