@@ -408,7 +408,7 @@ export default function QuestionDetailPage() {
             </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 pb-6">
           <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-2 text-white">
             Community Solutions <span className="bg-zinc-800 text-zinc-400 text-xs px-2 py-1 rounded-full">{answers.length}</span>
           </h3>
