@@ -49,11 +49,10 @@ export async function middleware(req: NextRequest) {
   }
 
   // Signed-in: validate SASTRA email domains
+
   const allowedDomains = [
     "@sastra.ac.in",
-    "@it.sastra.edu",
-    "@cse.sastra.edu",
-    "@soc.sastra.edu",
+    ".sastra.edu",
   ];
   const email = (user.email ?? "").toLowerCase().trim();
   const isAllowed = allowedDomains.some((d) => email.endsWith(d));

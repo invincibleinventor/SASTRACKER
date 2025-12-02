@@ -9,12 +9,9 @@ import Logo from '@/components/Logo';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 const supabase = createPagesBrowserClient();
 
-// Allowed domains (same as middleware)
   const allowedDomains = [
     "@sastra.ac.in",
-    "@it.sastra.edu",
-    "@cse.sastra.edu",
-    "@soc.sastra.edu",
+    ".sastra.edu",
   ];
 export default function AuthPage() {
   const searchParams = useSearchParams();
@@ -24,7 +21,6 @@ export default function AuthPage() {
 
 
   
-  // Run on mount: detect invalid_domain flag or an already-signed-in user with invalid email
   useEffect(() => {
     async function check() {
       const invalidDomainFlag = searchParams.get('invalid_domain');
@@ -155,4 +151,3 @@ export default function AuthPage() {
     </div>
   );
 }
-

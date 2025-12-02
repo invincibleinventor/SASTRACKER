@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { Filter, Search, Star, ArrowRight, Loader2, Image as ImageIcon } from 'lucide-react';
 
-
 const supabase = createPagesBrowserClient();
+
 let feedCache = {
   queryKey: '', 
   data: [] as any[],
@@ -71,7 +71,8 @@ export default function Home() {
     year: searchParams.get('year') || '', 
     subject: searchParams.get('subject') || '', 
     exam: searchParams.get('exam') || '', 
-    date: searchParams.get('date') || '' 
+    date: searchParams.get('date') || '',
+    marks: searchParams.get('marks') || ''
   });
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
 
@@ -99,11 +100,10 @@ export default function Home() {
         setPage(feedCache.page);
         setHasMore(feedCache.hasMore);
         setHasSearched(true);
-
         return;
     }
 
-    if (!currentQuery && !currentFilters.year && !currentFilters.subject && !currentFilters.exam && !currentFilters.date) return;
+    if (!currentQuery && !currentFilters.year && !currentFilters.subject && !currentFilters.exam && !currentFilters.date && !currentFilters.marks) return;
 
     setIsLoading(true);
     const currentPage = isNewSearch ? 0 : page;
@@ -129,6 +129,7 @@ export default function Home() {
         if (currentFilters.subject) query = query.ilike('papers.subject', `%${currentFilters.subject}%`);
         if (currentFilters.exam) query = query.eq('papers.exam_type', currentFilters.exam);
         if (currentFilters.date) query = query.eq('papers.exam_year', currentFilters.date);
+        if (currentFilters.marks) query = query.eq('marks', currentFilters.marks);
 
         const res = await query;
         data = res.data;
@@ -180,14 +181,15 @@ export default function Home() {
         year: searchParams.get('year') || '',
         subject: searchParams.get('subject') || '',
         exam: searchParams.get('exam') || '',
-        date: searchParams.get('date') || ''
+        date: searchParams.get('date') || '',
+        marks: searchParams.get('marks') || ''
     };
     const q = searchParams.get('q') || '';
     
     setFilters(urlFilters);
     setSearchQuery(q);
 
-    if (q || urlFilters.year || urlFilters.subject || urlFilters.exam || urlFilters.date) {
+    if (q || urlFilters.year || urlFilters.subject || urlFilters.exam || urlFilters.date || urlFilters.marks) {
         fetchQuestions(urlFilters, q, true);
     }
   }, [searchParams]);
@@ -201,6 +203,7 @@ export default function Home() {
         if (newFilters.subject) params.set('subject', newFilters.subject);
         if (newFilters.exam) params.set('exam', newFilters.exam);
         if (newFilters.date) params.set('date', newFilters.date);
+        if (newFilters.marks) params.set('marks', newFilters.marks);
     }
     router.push(`/?${params.toString()}`);
   };
@@ -217,6 +220,7 @@ export default function Home() {
         subject: '',
         exam: '',
         date: '',
+        marks: '', // Added this line to satisfy type requirement
         [key]: val 
     };
     
@@ -238,11 +242,11 @@ export default function Home() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <div className="bg-black border border-zinc-800 p-6 mb-8 sticky top-20 z-40 shadow-2xl shadow-black">
+      <div className="bg-black border border-zinc-800 p-6 mb-8 lg:sticky top-20 z-40 shadow-2xl shadow-black">
         <div className="mb-6 relative">
             <input 
                 type="text" 
-                className="w-full bg-zinc-900 border border-zinc-700 p-4 pl-12 text-white placeholder-zinc-500 focus:border-red-600 outline-none transition-colors"
+                className="w-full lg:text-base text-sm bg-zinc-900 border border-zinc-700 p-4 pl-12 text-white placeholder-zinc-500 focus:border-red-600 outline-none transition-colors"
                 placeholder="Search across all questions (e.g., 'Resultant', 'Routhe Array')..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -251,7 +255,7 @@ export default function Home() {
             <Search className="absolute left-4 top-4 text-zinc-500" size={20} />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 items-end">
           <select className={styles.input} value={filters.year} onChange={e => setFilters({...filters, year: e.target.value, subject: ''})}>
             <option value="">Year...</option>
             <option value="First Year">First Year</option>
@@ -268,7 +272,11 @@ export default function Home() {
             {['CIA - 1', 'CIA - 2', 'CIA - 3', 'End Sem', 'Lab Cia', 'End Sem Lab'].map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           <input type="number" className={styles.input} placeholder="Year" value={filters.date} onChange={e => setFilters({...filters, date: e.target.value})} />
-          <button onClick={handleSearchClick} className={styles.btnPrimary+' h-full'}><Search size={14}/> Find</button>
+          <select className={styles.input} value={filters.marks} onChange={e => setFilters({...filters, marks: e.target.value})}>
+            <option value="">Marks...</option>
+            {[1,2,3,4,5,7,8,10,15,20,25].map(m => <option key={m} value={m}>{m} Marks</option>)}
+          </select>
+          <button onClick={handleSearchClick} className={styles.btnPrimary+' h-full col-span-2 md:col-span-1'}><Search size={14}/> Find</button>
         </div>
       </div>
 
@@ -286,7 +294,10 @@ export default function Home() {
 
         {displayQuestions.map(q => (
           <div key={q.id} onClick={() => navigateToDetail(q.id)} className="bg-black border border-zinc-800 p-6 hover:border-red-900/40 cursor-pointer transition-colors group relative flex flex-col">
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="absolute top-4 right-4 text-zinc-500 font-mono text-xs border border-zinc-800 px-2 py-1">
+               {q.marks || 0} Marks
+            </div>
+            <div className="flex flex-wrap gap-2 mb-4 pr-16">
               <span onClick={(e) => handleTagClick(e, 'year', q.academic_year)} className={styles.tag}>{q.academic_year}</span>
               <span onClick={(e) => handleTagClick(e, 'subject', q.subject)} className={styles.tag}>{q.subject}</span>
               <span onClick={(e) => handleTagClick(e, 'exam', q.exam_type)} className={styles.tag}>{q.exam_type}</span>
@@ -316,13 +327,13 @@ export default function Home() {
             </div>
             
             <div className="flex items-center justify-between border-t border-zinc-900 pt-4 mt-4 ml-16">
-               <span className="text-zinc-500 group-hover:text-red-500 flex items-center gap-2 text-xs uppercase font-bold transition-colors">
-                 View Solution <ArrowRight size={14} />
+               <span className="text-zinc-500 group-hover:text-red-500 flex items-center gap-2 text-[10px] lg:text-xs uppercase font-bold transition-colors">
+                 <span className='hidden lg:inline-block'>View</span>Solution <ArrowRight size={14} />
                </span>
                <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1 border border-zinc-800">
                  <Star size={12} className="text-amber-500 fill-amber-500" />
-                 <span className="text-xs font-mono font-bold text-zinc-300">
-                    Avg Diff: {q.avg_rating > 0 ? q.avg_rating.toFixed(1) : "N/A"} / 5
+                 <span className="text-[10px] lg:text-xs font-mono font-bold text-zinc-300">
+                    <span className="hidden lg:inline-block">Avg</span> Diff: {q.avg_rating > 0 ? q.avg_rating.toFixed(1) : "N/A"} / 5
                  </span>
                </div>
             </div>

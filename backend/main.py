@@ -4,30 +4,26 @@ import uuid
 import tempfile
 import base64
 import io
+import urllib.request
 from typing import List, Optional
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
-import pypdfium2 as pdfium  # REPLACED pdf2image
+import pypdfium2 as pdfium
 from dotenv import load_dotenv
 import PIL.Image
 
-# --- Configuration ---
 load_dotenv() 
 
-# Configure Gemini
 GENAI_KEY = os.getenv("GOOGLE_API_KEY")
 if not GENAI_KEY:
-    print("WARNING: GOOGLE_API_KEY not found in environment variables.")
+    print("WARNING: GOOGLE_API_KEY not found.")
 
 genai.configure(api_key=GENAI_KEY)
 
-# Initialize FastAPI
 app = FastAPI(title="Question Paper Extractor API")
 
-# --- CORS Configuration ---
-# Update this list with your actual Vercel frontend URL
 origins = [
     "http://localhost:3000",
     "https://sastracker.vercel.app",
@@ -45,12 +41,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Data Models ---
+class ExtractRequest(BaseModel):
+    file_url: str
+
 class Question(BaseModel):
     id: str
     number: str
     type: str 
     content: str
+    marks: int
     isMath: bool
     hasImage: bool
     image_base64: Optional[str] = None 
@@ -59,18 +58,12 @@ class ExtractionResponse(BaseModel):
     questions: List[Question]
     total: int
 
-# --- Helper Functions ---
-
 def analyze_images_with_gemini(image_paths: List[str]) -> List[dict]:
-    """
-    Sends images to Gemini 2.5 Flash for question extraction.
-    """
     if not GENAI_KEY:
         raise HTTPException(status_code=500, detail="Server missing API Key")
 
     model = genai.GenerativeModel('gemini-2.5-flash')
     
-    # Prepare the prompt
     prompt = """
     You are an expert exam digitizer. 
     Analyze the provided images of a question paper.
@@ -78,20 +71,18 @@ def analyze_images_with_gemini(image_paths: List[str]) -> List[dict]:
     
     Rules:
     1. If a question spans multiple pages, merge it into one.
-    2. Identify if the question is primarily text, math (contains equations), or image-based (relies on a diagram).
-    3. For Math: Convert all mathematical expressions to valid LaTeX enclosed in single $...$ for inline or $$...$$ for block. 
-       IMPORTANT: You must ESCAPE all backslashes in the JSON string (e.g., use "\\frac" instead of "\frac").
-    4. For Images: If the question has a diagram/figure:
-       - Set "hasImage": true.
-       - Provide "page_number" (integer, 1-indexed) indicating which page contains the image.
-       - Provide "visual_bbox": [ymin, xmin, ymax, xmax] (integers, 0-1000 scale) representing the bounding box of the diagram.
-    5. Return ONLY a valid JSON array of objects.
+    2. Identify if the question is primarily text, math, or image-based.
+    3. Extract the MARKS allocated for each question (integer). Look for numbers in brackets like [5], (2), or text like "10 marks". Default to 1 if not found.
+    4. For Math: Convert expressions to valid LaTeX enclosed in single $...$ for inline or $$...$$ for block. ESCAPE backslashes.
+    5. For Images: Set hasImage: true, provide page_number (1-indexed), and visual_bbox [ymin, xmin, ymax, xmax] (0-1000 scale).
+    6. Return ONLY a valid JSON array of objects.
     
     JSON Structure per object:
     {
         "number": "Question number (e.g. 1, 2a, 3)",
         "type": "text" | "math" | "image",
         "content": "The full text content with LaTeX",
+        "marks": int,
         "isMath": boolean,
         "hasImage": boolean,
         "page_number": int (optional),
@@ -115,7 +106,6 @@ def analyze_images_with_gemini(image_paths: List[str]) -> List[dict]:
             
         data = json.loads(text_response)
         
-        # --- Post-Processing: Crop Images ---
         for q in data:
             if q.get('hasImage') and 'visual_bbox' in q and 'page_number' in q:
                 try:
@@ -131,62 +121,45 @@ def analyze_images_with_gemini(image_paths: List[str]) -> List[dict]:
                         bottom = ymax * height / 1000
                         
                         cropped_img = target_img.crop((left, top, right, bottom))
-                        
                         buffered = io.BytesIO()
                         cropped_img.save(buffered, format="JPEG")
                         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                        
                         q['image_base64'] = f"data:image/jpeg;base64,{img_str}"
                 except Exception as img_err:
                     print(f"Failed to crop image for Q{q.get('number')}: {img_err}")
-        
         return data
 
     except json.JSONDecodeError as je:
         print(f"JSON Decode Error: {je}")
-        print(f"Raw Response: {text_response}")
-        raise HTTPException(status_code=500, detail="AI returned invalid JSON. Try again.")
+        raise HTTPException(status_code=500, detail="AI returned invalid JSON.")
     except Exception as e:
         print(f"AI Processing Error: {e}")
         raise HTTPException(status_code=500, detail=f"AI Processing Failed: {str(e)}")
 
-# --- Endpoints ---
-
 @app.post("/extract", response_model=ExtractionResponse)
-async def extract_questions(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="File must be a PDF")
-
-    # Save Upload temporarily
-    # Note: Vercel /tmp is the only writable directory
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", dir='/tmp') as tmp_pdf:
-        tmp_pdf.write(await file.read())
-        tmp_pdf_path = tmp_pdf.name
+async def extract_questions(request: ExtractRequest):
+    try:
+        temp_filename = f"/tmp/{uuid.uuid4()}.pdf"
+        urllib.request.urlretrieve(request.file_url, temp_filename)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to download PDF from URL: {str(e)}")
 
     image_paths = []
     
     try:
-        # 1. Convert PDF to Images using pypdfium2 (No Poppler required!)
-        pdf = pdfium.PdfDocument(tmp_pdf_path)
-        
-        # Render pages
-        # Limit to first 5 pages to prevent timeouts on Vercel Free Tier
-        n_pages = min(len(pdf), 5) 
+        pdf = pdfium.PdfDocument(temp_filename)
+        n_pages = min(len(pdf), 10) 
         
         for i in range(n_pages):
             page = pdf[i]
-            # Render at 2x scale for better OCR quality
             bitmap = page.render(scale=2)
             pil_image = bitmap.to_pil()
-            
-            tmp_img_path = f"/tmp/page_{i}.jpg"
+            tmp_img_path = f"/tmp/page_{uuid.uuid4()}_{i}.jpg"
             pil_image.save(tmp_img_path, "JPEG")
             image_paths.append(tmp_img_path)
 
-        # 2. Process with AI
         extracted_data = analyze_images_with_gemini(image_paths)
 
-        # 3. Format Response
         final_questions = []
         for q in extracted_data:
             final_questions.append(Question(
@@ -194,6 +167,7 @@ async def extract_questions(file: UploadFile = File(...)):
                 number=str(q.get("number", "?")),
                 type=q.get("type", "text"),
                 content=q.get("content", ""),
+                marks=int(q.get("marks", 0)),
                 isMath=q.get("isMath", False),
                 hasImage=q.get("hasImage", False),
                 image_base64=q.get("image_base64", None)
@@ -207,15 +181,12 @@ async def extract_questions(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
     
     finally:
-        # Cleanup
-        if os.path.exists(tmp_pdf_path):
-            os.remove(tmp_pdf_path)
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
         for p in image_paths:
             if os.path.exists(p):
                 os.remove(p)
 
-# Vercel requires the app instance to be available
-# No changes needed here, uvicorn is for local dev
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

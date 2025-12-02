@@ -8,9 +8,7 @@ import {
 } from 'lucide-react';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 
-
 const supabase = createPagesBrowserClient();
-
 
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -20,10 +18,10 @@ const LatexRenderer = ({ text }: { text: string }) => {
     if ((window as any).katex) { setIsLoaded(true); return; }
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
+    link.href = "[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css)";
     document.head.appendChild(link);
     const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js";
+    script.src = "[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js)";
     script.onload = () => setIsLoaded(true);
     document.head.appendChild(script);
   }, []);
@@ -79,7 +77,7 @@ const PublishModal = ({ isOpen, onClose, onConfirm }: any) => {
       supabase.from('subjects').select('subject_name').eq('academic_year', meta.year)
         .then(({ data }) => {
           const subjects = data ? data.map(s => s.subject_name) : [];
-          subjectsCache.current[meta.year] = subjects; // Update cache
+          subjectsCache.current[meta.year] = subjects; 
           setAvailableSubjects(subjects);
           setLoadingSubjects(false);
         });
@@ -168,10 +166,11 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState(question.content);
   const [difficulty, setDifficulty] = useState(question.difficulty || 1);
+  const [marks, setMarks] = useState(question.marks || 0);
   const [image, setImage] = useState(question.image);
   const fileRef = useRef<HTMLInputElement>(null);
   
-  const handleSave = () => { onSave({ ...question, content, difficulty, image, verified: true }); setIsEditing(false); };
+  const handleSave = () => { onSave({ ...question, content, difficulty, marks, image, verified: true }); setIsEditing(false); };
   
   return (
     <div className={`bg-black border border-zinc-800 p-6 mb-4 ${question.verified ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-amber-500'}`}>
@@ -183,11 +182,17 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
               <textarea className="bg-zinc-900 border border-zinc-700 p-3 text-white w-full text-sm outline-none focus:border-red-600 font-mono" rows={6} value={content} onChange={(e) => setContent(e.target.value)} />
               
               <div className="flex justify-between items-center border border-zinc-700 p-2 bg-zinc-900/50">
-                  <div className="flex items-center gap-2">
-                      <span className="text-[10px] uppercase font-bold text-zinc-500">Difficulty</span>
-                      <select className="bg-black text-white text-xs border border-zinc-700" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))}>
-                          {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
-                      </select>
+                  <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                          <span className="text-[10px] uppercase font-bold text-zinc-500">Difficulty</span>
+                          <select className="bg-black text-white text-xs border border-zinc-700" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))}>
+                              {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <span className="text-[10px] uppercase font-bold text-zinc-500">Marks</span>
+                          <input type="number" className="bg-black text-white text-xs border border-zinc-700 w-16 p-1" value={marks} onChange={e => setMarks(Number(e.target.value))} />
+                      </div>
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -204,26 +209,15 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
                         }
                       }} 
                     />
-                    <button 
-                      onClick={() => fileRef.current?.click()} 
-                      className="text-xs text-red-400 uppercase font-bold flex items-center gap-1 hover:text-red-300"
-                    >
-                      <ImageIcon size={14} /> {image ? 'Replace Image' : 'Add Image'}
+                    <button onClick={() => fileRef.current?.click()} className="text-xs text-red-400 uppercase font-bold flex items-center gap-1 hover:text-red-300">
+                      <ImageIcon size={14} /> {image ? 'Replace' : 'Add'}
                     </button>
                     {image && (
-                      <button onClick={() => setImage(null)} className="text-zinc-500 hover:text-red-500">
-                        <Trash2 size={14} />
-                      </button>
+                      <button onClick={() => setImage(null)} className="text-zinc-500 hover:text-red-500"><Trash2 size={14} /></button>
                     )}
                   </div>
               </div>
-
-              {image && (
-                <div className="border border-zinc-800 bg-black p-2">
-                  <img src={image} alt="Preview" className="max-h-40 object-contain" />
-                </div>
-              )}
-
+              {image && <div className="border border-zinc-800 bg-black p-2"><img src={image} alt="Preview" className="max-h-40 object-contain" /></div>}
               <div className="bg-zinc-900/30 p-4 border border-zinc-800/50">
                  <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-zinc-500 uppercase"><Eye size={12} /> Live Preview</div>
                  <div className="prose prose-invert max-w-none text-gray-300 text-sm"><LatexRenderer text={content} /></div>
@@ -233,6 +227,7 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
             <div className="prose prose-invert max-w-none text-gray-200 text-sm font-light leading-relaxed">
               <LatexRenderer text={content} />
               {image && <img src={image} className="mt-4 border border-zinc-800 bg-black max-h-60" />}
+              <div className="mt-2 text-xs text-zinc-500 font-mono text-right">Marks: {marks}</div>
             </div>
           )}
         </div>
@@ -257,12 +252,16 @@ export default function UploadPage() {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
       if (!session) router.push('/auth');
     });
   }, [router]);
 
   const handleUpload = (file: File) => {
+    if (file.size > 4.5 * 1024 * 1024) {
+      alert(`File too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Max size is 4.5MB.`);
+      return;
+    }
     setUploadedFile(file);
     setView('processing');
   };
@@ -270,14 +269,8 @@ export default function UploadPage() {
   const handlePublish = async (meta: any) => {
     try {
         if (meta.isCustomSubject) {
-            const { data: existingSubs } = await supabase
-                .from('subjects')
-                .select('id')
-                .ilike('subject_name', meta.subject)
-                .maybeSingle();
-            
+            const { data: existingSubs } = await supabase.from('subjects').select('id').ilike('subject_name', meta.subject).maybeSingle();
             if (!existingSubs) {
-                // Insert new subject
                 const { error: subError } = await supabase.from('subjects').insert({
                     academic_year: meta.year,
                     subject_name: meta.subject
@@ -290,7 +283,7 @@ export default function UploadPage() {
             .from('papers')
             .select('id')
             .eq('academic_year', meta.year)
-            .ilike('subject', meta.subject) 
+            .ilike('subject', meta.subject)
             .eq('exam_type', meta.exam)
             .eq('exam_year', meta.date)
             .maybeSingle();
@@ -317,7 +310,8 @@ export default function UploadPage() {
             content: q.content,
             type: q.type,
             image_path: q.image, 
-            difficulty_rating: q.difficulty || 1
+            difficulty_rating: q.difficulty || 1,
+            marks: q.marks || 0
         }));
 
         const { error: qError } = await supabase.from('questions').insert(questionsToInsert);
@@ -330,20 +324,31 @@ export default function UploadPage() {
     }
   };
 
-
-
   if (view === 'processing') {
     if (uploadedFile && questions.length === 0) {
        const extract = async () => {
          try {
-            const formData = new FormData();
-            formData.append('file', uploadedFile);
-            const res = await fetch(process.env.SERVER=='local' ? 'http://localhost:8000/extract' : 'https://sastrackerbackend.vercel.app/extract', { method: 'POST', body: formData });
+            // 1. Upload to Supabase Storage
+            const fileExt = uploadedFile.name.split('.').pop();
+            const fileName = `${Math.random()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage.from('raw-pdfs').upload(fileName, uploadedFile);
+            if (uploadError) throw new Error("Upload to Storage failed: " + uploadError.message);
+
+            const { data: urlData } = supabase.storage.from('raw-pdfs').getPublicUrl(fileName);
+            const publicUrl = urlData.publicUrl;
+
+            // 2. Send URL to Backend
+            const res = await fetch(process.env.SERVER=='local' ? 'http://localhost:8000/extract' : '[https://sastrackerbackend.vercel.app/extract](https://sastrackerbackend.vercel.app/extract)', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_url: publicUrl })
+            });
+            
             if (!res.ok) throw new Error("Backend Error");
             const data = await res.json();
             const mapped = data.questions.map((q: any) => ({
                 ...q, verified: false, difficulty: 1, 
-                image: q.image_base64 || (q.hasImage ? "https://placehold.co/600x200?text=Image+Detected" : null)
+                image: q.image_base64 || (q.hasImage ? "[https://placehold.co/600x200?text=Image+Detected](https://placehold.co/600x200?text=Image+Detected)" : null)
             }));
             setQuestions(mapped);
             setView('review');

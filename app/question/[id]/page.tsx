@@ -1,9 +1,8 @@
 
-"use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation'; 
-import { createClient } from '@supabase/supabase-js'; 
+import { useParams, useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
 import { ArrowLeft, Star, User, Clock, Send, Paperclip, ChevronUp, ChevronDown, Loader2, X, Info } from 'lucide-react';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 const supabase = createPagesBrowserClient();
@@ -16,10 +15,10 @@ const LatexRenderer = ({ text }: { text: string }) => {
     if ((window as any).katex) { setIsLoaded(true); return; }
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
+    link.href = "[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css)";
     document.head.appendChild(link);
     const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js";
+    script.src = "[https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js](https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js)";
     script.onload = () => setIsLoaded(true);
     document.head.appendChild(script);
   }, []);
@@ -215,7 +214,9 @@ export default function QuestionDetailPage() {
   };
 
   if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center"><Loader2 className="animate-spin text-red-600" /></div>;
-  if (!question) return <div className="min-h-screen bg-black text-white p-10">Question not found.</div>;
+  if (!question) return <div className="min-h-screen bg-neutral-950 text-gray-100 font-sans p-6">
+    <div className="text-center pt-20 text-gray-400">Question not found.</div>
+  </div>;
 
   return (
     <div className="min-h-screen bg-neutral-950 text-gray-100 font-sans p-6">
@@ -226,8 +227,11 @@ export default function QuestionDetailPage() {
 
         <div className="bg-zinc-900 border border-zinc-800 p-8 mb-8 relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-red-600 to-pink-600"></div>
+          <div className="absolute top-4 right-4 text-xs font-mono border border-zinc-700 px-2 py-1 text-zinc-400">
+            Q{question.question_number} • {question.marks || 0} Marks
+          </div>
           
-          <div className="flex gap-2 mb-4 text-xs font-bold uppercase tracking-widest text-zinc-500">
+          <div className="flex gap-2 mb-4 text-xs font-bold uppercase tracking-widest text-zinc-500 pr-24">
             <span>{question.papers?.academic_year}</span> •
             <span className="text-red-500">{question.papers?.subject}</span> •
             <span>{question.papers?.exam_type} {question.papers?.exam_year}</span>
