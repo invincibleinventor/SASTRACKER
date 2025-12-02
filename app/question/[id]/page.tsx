@@ -1,66 +1,71 @@
-'use client';
-
+"use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation'; 
-import { ArrowLeft, Star, User, Clock, Send, Paperclip, ChevronUp, ChevronDown, Loader2, X, Info, Sparkles, Bot } from 'lucide-react';
+import { ArrowLeft, Star, User, Clock, Send, Paperclip, ChevronUp, ChevronDown, Loader2, X, Info, Sparkles, Bot, Trash2 } from 'lucide-react';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+
 const supabase = createPagesBrowserClient();
 
+// --- Enhanced LatexRenderer for HTML + Math ---
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+
+  const renderMath = () => {
+    if (!containerRef.current || !(window as any).renderMathInElement) return;
+    
+    // 1. Inject HTML (Titles, Tables, Lists)
+    containerRef.current.innerHTML = text;
+    
+    // 2. Render Math over the HTML
+    (window as any).renderMathInElement(containerRef.current, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\(', right: '\\)', display: false},
+        {left: '\\[', right: '\\]', display: true}
+      ],
+      throwOnError: false,
+      ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"] 
+    });
+  };
 
   useEffect(() => {
-    if ((window as any).katex) { setIsLoaded(true); return; }
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
-    document.head.appendChild(link);
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js";
-    script.onload = () => setIsLoaded(true);
-    document.head.appendChild(script);
-  }, []);
+    // Load KaTeX and Auto-Render Extension
+    if (!(window as any).katex) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
+        document.head.appendChild(link);
 
-  useEffect(() => {
-    if (!text || !containerRef.current) return;
-    if (isLoaded) {
-      try {
-        // Updated Regex to support $...$, $$...$$, and `...`
-        const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[\s\S]+?\$|`[\s\S]+?`)/g);
-        containerRef.current.innerHTML = '';
-        parts.forEach(part => {
-          if (part.startsWith('$$') && part.endsWith('$$')) {
-             const span = document.createElement('div');
-             const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\'); 
-             (window as any).katex.render(cleanMath, span, { displayMode: true, throwOnError: false }); 
-             containerRef.current?.appendChild(span);
-          } else if (part.startsWith('$') && part.endsWith('$')) {
-            const span = document.createElement('span');
-            const cleanMath = part.slice(1, -1).replace(/\\\\/g, '\\');
-            (window as any).katex.render(cleanMath, span, { throwOnError: false }); 
-            containerRef.current?.appendChild(span);
-          } else if (part.startsWith('`') && part.endsWith('`')) {
-            // Handle backticks as inline math (Common AI fallback)
-            const span = document.createElement('span');
-            const cleanMath = part.slice(1, -1).replace(/\\\\/g, '\\');
-            (window as any).katex.render(cleanMath, span, { throwOnError: false }); 
-            containerRef.current?.appendChild(span);
-          } else {
-            containerRef.current?.appendChild(document.createTextNode(part));
-          }
-        });
-      } catch (e) {
-        containerRef.current.innerText = text;
-      }
+        const script = document.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js";
+        script.onload = () => {
+            const autoRender = document.createElement("script");
+            autoRender.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js";
+            autoRender.onload = () => renderMath();
+            document.head.appendChild(autoRender);
+        };
+        document.head.appendChild(script);
     } else {
-      containerRef.current.innerText = text;
+        renderMath();
     }
-  }, [text, isLoaded]);
+  }, [text]);
 
-  return <div ref={containerRef} className="latex-content hide-scrollbar overflow-x-auto inline-block w-full break-words" />;
+  return (
+    <div 
+        ref={containerRef} 
+        className="latex-content prose prose-invert max-w-none 
+                   [&_table]:w-full [&_table]:border-collapse [&_table]:my-4
+                   [&_th]:border [&_th]:border-zinc-700 [&_th]:bg-zinc-900 [&_th]:p-2 [&_th]:text-left
+                   [&_td]:border [&_td]:border-zinc-700 [&_td]:p-2
+                   [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mt-6 [&_h3]:mb-2 [&_h3]:text-white
+                   [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5
+                   overflow-x-auto"
+    >{text}</div>
+  );
 };
+
 export default function QuestionDetailPage() {
   const params = useParams();
   const id = params?.id as string;
@@ -79,7 +84,8 @@ export default function QuestionDetailPage() {
   const [generatingAI, setGeneratingAI] = useState(false);
   const [uploading, setUploading] = useState(false);
   const answerFileRef = useRef<HTMLInputElement>(null);
-const[server,setServer]=useState('prod');
+  const [server, setServer] = useState('prod');
+
   // Check Auth
   useEffect(() => {
     setServer(process.env.NEXT_PUBLIC_SERVER || 'prod');
@@ -144,14 +150,12 @@ const[server,setServer]=useState('prod');
     setGeneratingAI(true);
 
     try {
-        // Call your backend
-                const res = await fetch(server=='local'?'http://localhost:8000/solve':'https://sastrackerbackend.vercel.app/solve', {
-
+        const res = await fetch(server === 'local' ? 'http://localhost:8000/solve' : 'https://sastrackerbackend.vercel.app/solve', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 content: question.content,
-                image_url: question.image_path // Pass the image URL if it exists
+                image_url: question.image_path 
             })
         });
 
@@ -159,7 +163,6 @@ const[server,setServer]=useState('prod');
         const data = await res.json();
         const solution = data.solution;
 
-        // Save to DB
         const { error } = await supabase.from('ai_answers').insert({
             question_id: id,
             content: solution
@@ -211,6 +214,17 @@ const[server,setServer]=useState('prod');
         alert(`Failed to post: ${error.message}`);
     } finally {
         setUploading(false);
+    }
+  };
+
+  const handleDeleteAnswer = async (answerId: string) => {
+    if (!confirm("Delete your answer?")) return;
+    try {
+        const { error } = await supabase.from('answers').delete().eq('id', answerId);
+        if (error) throw error;
+        setAnswers(answers.filter(a => a.id !== answerId));
+    } catch (e) {
+        alert("Failed to delete answer.");
     }
   };
 
@@ -277,8 +291,8 @@ const[server,setServer]=useState('prod');
   };
 
   if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center"><Loader2 className="animate-spin text-red-600" /></div>;
-  if (!question) return <div className="min-h-screen bg-neutral-950 text-gray-100 font-sans p-6">
-    <div className="text-center pt-20 text-gray-400">Question not found.</div>
+  if (!question) return <div className="min-h-screen bg-neutral-950 text-gray-100 font-sans p-6 flex items-center justify-center">
+    <div className="text-center text-zinc-500">Question not found.</div>
   </div>;
 
   return (
@@ -301,7 +315,7 @@ const[server,setServer]=useState('prod');
             <span>{question.papers?.exam_type} {question.papers?.exam_year}</span>
           </div>
 
-          <div className="text-xl md:text-2xl leading-relaxed font-light text-white mb-6">
+          <div className="text-xl md:text-2xl leading-relaxed font-light text-white mb-6 prose prose-invert max-w-none">
             <LatexRenderer text={question.content} />
             {question.image_path && (
                 <img src={question.image_path} alt="Question Diagram" className="mt-6 max-h-96 rounded border border-zinc-700 block" />
@@ -340,13 +354,11 @@ const[server,setServer]=useState('prod');
             </div>
             
             {aiAnswer ? (
-                <div className="bg-zinc-900/50 border border-purple-500/30 p-6 rounded-lg">
-                    <div className="flex items-center gap-2 mb-4 text-purple-400 text-xs font-bold uppercase tracking-widest">
-                        <Bot size={16} /> Generated by AI
+                <div className="bg-zinc-900/50 border border-purple-500/30 p-6 rounded-lg prose prose-invert max-w-none">
+                    <div className="flex items-center gap-2 mb-4 text-purple-400 text-xs font-bold uppercase tracking-widest not-prose">
+                        <Bot size={16} /> Generated by Gemini
                     </div>
-                    <div className="text-gray-300 leading-relaxed">
-                        <LatexRenderer text={aiAnswer} />
-                    </div>
+                    <LatexRenderer text={aiAnswer} />
                 </div>
             ) : (
                 <div className="bg-zinc-900/30 border border-zinc-800 border-dashed p-8 text-center">
@@ -425,12 +437,19 @@ const[server,setServer]=useState('prod');
                 </div>
 
                 <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="bg-zinc-800 p-1 rounded-full"><User size={12} className="text-zinc-400"/></div>
-                        <span className="text-sm font-bold text-zinc-300">{ans.author_name}</span>
-                        <span className="text-xs text-zinc-600 flex items-center gap-1"><Clock size={10}/> {new Date(ans.created_at).toLocaleDateString()}</span>
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-zinc-800 p-1 rounded-full"><User size={12} className="text-zinc-400"/></div>
+                            <span className="text-sm font-bold text-zinc-300">{ans.author_name}</span>
+                            <span className="text-xs text-zinc-600 flex items-center gap-1"><Clock size={10}/> {new Date(ans.created_at).toLocaleDateString()}</span>
+                        </div>
+                        {user?.id === ans.user_id && (
+                           <button onClick={() => handleDeleteAnswer(ans.id)} className="text-zinc-600 hover:text-red-500 transition-colors" title="Delete">
+                             <Trash2 size={14} />
+                           </button>
+                        )}
                     </div>
-                    <div className="text-zinc-400 text-sm leading-relaxed mb-3">
+                    <div className="text-zinc-400 text-sm leading-relaxed mb-3 prose prose-invert max-w-none">
                         <LatexRenderer text={ans.content} />
                     </div>
                     {ans.image_url && (

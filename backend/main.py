@@ -78,6 +78,7 @@ def analyze_images_with_gemini(image_paths: List[str]) -> List[dict]:
 
     model = genai.GenerativeModel('gemini-2.5-flash')
     
+    # Updated Prompt with Smarter Marks Deduction Logic
     prompt = """
     You are an expert exam digitizer. 
     Analyze the provided images of a question paper.
@@ -126,7 +127,6 @@ def analyze_images_with_gemini(image_paths: List[str]) -> List[dict]:
         try:
             data = json.loads(text_response)
         except json.JSONDecodeError:
-            # Fallback: aggressive backslash cleanup for LaTeX in JSON
             cleaned_response = re.sub(r'(?<!\\)\\(?!["\\/bfnrtu])', r'\\\\', text_response)
             data = json.loads(cleaned_response)
         
@@ -153,11 +153,8 @@ def analyze_images_with_gemini(image_paths: List[str]) -> List[dict]:
                     print(f"Failed to crop image: {img_err}")
         return data
 
-    except json.JSONDecodeError as je:
-        print(f"JSON Decode Error: {je}")
-        raise HTTPException(status_code=500, detail="AI returned invalid JSON. Please try again.")
     except Exception as e:
-        print(f"AI Processing Error: {e}")
+        print(f"AI Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"AI Processing Failed: {str(e)}")
 
 # --- Endpoints ---
@@ -221,31 +218,37 @@ async def solve_question(request: SolveRequest):
         
     model = genai.GenerativeModel('gemini-2.5-flash')
     
-    # Updated Prompt for "Exam Script" Style
+    # Updated Prompt: HTML for Structure, LaTeX for Math
     prompt = f"""
-    You are an exemplary student answering an examination question. Provide a solution that earns full marks.
+    You are an expert academic tutor. Provide a comprehensive solution to this question.
 
     **Question:**
     {request.content}
     
-    **Strict Formatting Rules (CRITICAL - NO MARKDOWN):**
-    1. **NO Markdown:** Do NOT use `**bold**`, `## Headers`, `*italics*`, or `> quotes`. The display engine DOES NOT support Markdown. 
-       - Use LaTeX `\\textbf{{Title}}` for headings or emphasis.
-       - Use LaTeX `\\underline{{text}}` for underlining.
-       - Use plain text for normal paragraphs.
-    2. **Mathematics & Problem Solving:**
-       - Structure the answer as a logical flow of steps (e.g., "Step 1:", "Step 2:").
-       - Use LaTeX for ALL mathematical expressions (enclosed in $...$ or $$...$$).
-       - Keep explanations concise; focus on the mathematical derivation.
-       - State the final result clearly at the end.
-    3. **Theory & Explanations:**
-       - Provide a DETAILED, comprehensive answer.
-       - Use clear paragraphs.
-       - Use bullet points by starting lines with a simple hyphen `-`.
-       - Explain key concepts thoroughly as if writing for a high-scoring exam.
+    **FORMATTING INSTRUCTIONS (CRITICAL):**
+    1. **Structure with HTML:**
+       - Use `<h3>` for step titles (e.g., <h3>Step 1: Identification</h3>).
+       - Use `<p>` for paragraphs.
+       - Use `<ul>` and `<li>` for lists.
+       - Use `<b>` for bold text and `<i>` for italics.
+       - Use `<br>` for line breaks.
     
-    **Output Style:**
-    Produce a raw text string that renders beautifully when passed to a LaTeX renderer. Do not include conversational filler like "Here is the solution". Start directly with the answer.
+    2. **Math with LaTeX:**
+       - Enclose ALL mathematical expressions in standard LaTeX delimiters:
+         - Inline: `$ ... $`
+         - Block: `$$...$$`
+    
+    3. **Tables:**
+       - Use standard HTML `<table>`, `<tr>`, `<td>`, `<th>` tags with a `border="1"` attribute for tables (like K-Maps).
+       - OR use LaTeX `$$\\begin{{array}}...\\end{{array}}$$` if strictly mathematical.
+    
+    **Example Output Format:**
+    <h3>Step 1: Analysis</h3>
+    <p>The function is given by $f(x) = x^2$. We need to find the derivative.</p>
+    <ul>
+      <li>First, apply the power rule.</li>
+      <li>The result is $f'(x) = 2x$.</li>
+    </ul>
     """
     
     content_parts = [prompt]
