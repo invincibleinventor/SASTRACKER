@@ -220,7 +220,7 @@ async def solve_question(request: SolveRequest):
     
     # Updated Prompt: HTML for Structure, LaTeX for Math
     prompt = f"""
-    You are an expert academic tutor. Provide a comprehensive solution to this question.
+    You are an expert academic tutor. Provide a comprehensive solution to this question. You always give the easiest and the most straightforward answer without any additional explanation or story. U dont go in any roundabout way to solve a problem. You always give the solution with the simplest and fewest number of steps.
 
     **Question:**
     {request.content}
