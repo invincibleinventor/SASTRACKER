@@ -1,13 +1,18 @@
 "use client"
 
+
 import React, { useEffect, useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Lock, ShieldAlert, Loader2, LogOut } from 'lucide-react';
+
+import { ShieldAlert, Loader2 } from 'lucide-react';
 import Logo from '@/components/Logo';
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+const supabase = createPagesBrowserClient();
 
-const supabase = createClientComponentClient();
-
+  const allowedDomains = [
+    "@sastra.ac.in",
+    ".sastra.edu",
+  ];
 export default function AuthPage() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -15,20 +20,47 @@ export default function AuthPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Extract error from URL (set by Middleware)
-    const errorMsg = searchParams.get('error');
-    if (errorMsg) {
-      setError(errorMsg);
-      // If we arrived here with an error, ensure we clean up any stale local session
-      supabase.auth.signOut();
+    async function check() {
+      const invalidDomainFlag = searchParams.get('invalid_domain');
+
+      if (invalidDomainFlag === '1') {
+        setError("Your email is not from the allowed SASTRA domains. Signing you out...");
+        await supabase.auth.signOut();
+        return;
+      }
+
+      const { data: { session }, error: sessErr } = await supabase.auth.getSession();
+
+      if (sessErr) {
+        console.error("Session error:", sessErr);
+      }
+
+      const user = session?.user ?? null;
+      if (!user) {
+        return;
+      }
+
+      const email = (user.email ?? '').toLowerCase().trim();
+      const isAllowed = allowedDomains.some(d => email.endsWith(d));
+
+      if (!isAllowed) {
+        setError("Your current account email is not allowed. Signing out...");
+        await supabase.auth.signOut();
+        return;
+      }
+
+    window.location.replace('/');
     }
-  }, [searchParams]);
+
+    check();
+  }, []);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError("");
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      // FIX: Changed redirectTo to point to the callback route, NOT /auth
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -39,7 +71,7 @@ export default function AuthPage() {
         }
       });
 
-      if (error) throw error;
+      if (oauthError) throw oauthError;
     } catch (err: any) {
       setError(err?.message || "Login failed");
       setLoading(false);
@@ -62,8 +94,8 @@ export default function AuthPage() {
         </div>
 
         {error && (
-          <div className="bg-red-900/20 border border-red-900/50 text-red-500 p-3 mb-6 text-xs font-mono flex items-center justify-between gap-2">
-            <span>{error}</span>
+          <div className="bg-red-900/20 border border-red-900/50 text-red-500 p-3 mb-6 text-xs font-mono">
+            {error}
           </div>
         )}
 
@@ -77,7 +109,7 @@ export default function AuthPage() {
               <p className="text-amber-700/80 text-[10px] leading-relaxed">
                 Restricted to SASTRA Deemed University. Sign in with your official email: <br/>
                 <span className="block mt-1 font-mono text-amber-500">
-                  @sastra.ac.in, @it.sastra.edu, @ict.sastra.edu, @soc.sastra.edu, @cse.sastra.edu
+                  @sastra.ac.in
                 </span>
               </p>
             </div>
