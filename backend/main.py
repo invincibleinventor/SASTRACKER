@@ -78,7 +78,6 @@ def analyze_images_with_gemini(image_paths: List[str]) -> List[dict]:
 
     model = genai.GenerativeModel('gemini-2.5-flash')
     
-    # Updated Prompt with Smarter Marks Deduction Logic and strict JSON escaping
     prompt = """
     You are an expert exam digitizer. 
     Analyze the provided images of a question paper.
@@ -119,23 +118,18 @@ def analyze_images_with_gemini(image_paths: List[str]) -> List[dict]:
         )
         
         text_response = response.text
-        # Cleanup JSON markdown if present
         if "```json" in text_response:
             text_response = text_response.split("```json")[1].split("```")[0]
         elif "```" in text_response:
             text_response = text_response.split("```")[1]
         
-        # Attempt to parse JSON, with a fallback cleanup for LaTeX backslashes
         try:
             data = json.loads(text_response)
         except json.JSONDecodeError:
-            # Common AI error: outputting single backslashes for LaTeX (e.g., \frac) which breaks JSON.
-            # This regex finds backslashes not part of a valid JSON escape sequence and double-escapes them.
-            # Valid JSON escapes: \", \\, \/, \b, \f, \n, \r, \t, \uXXXX
+            # Fallback: aggressive backslash cleanup for LaTeX in JSON
             cleaned_response = re.sub(r'(?<!\\)\\(?!["\\/bfnrtu])', r'\\\\', text_response)
             data = json.loads(cleaned_response)
         
-        # --- Post-Processing: Crop Images ---
         for q in data:
             if q.get('hasImage') and 'visual_bbox' in q and 'page_number' in q:
                 try:
@@ -156,12 +150,11 @@ def analyze_images_with_gemini(image_paths: List[str]) -> List[dict]:
                         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
                         q['image_base64'] = f"data:image/jpeg;base64,{img_str}"
                 except Exception as img_err:
-                    print(f"Failed to crop image for Q{q.get('number')}: {img_err}")
+                    print(f"Failed to crop image: {img_err}")
         return data
 
     except json.JSONDecodeError as je:
         print(f"JSON Decode Error: {je}")
-        print(f"Raw Response (first 500 chars): {text_response[:500]}")
         raise HTTPException(status_code=500, detail="AI returned invalid JSON. Please try again.")
     except Exception as e:
         print(f"AI Processing Error: {e}")
@@ -174,8 +167,6 @@ async def extract_questions(file: UploadFile = File(...)):
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="File must be a PDF")
 
-    # Save Upload temporarily
-    # Using /tmp is safe on Vercel/Cloud Run
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", dir='/tmp') as tmp_pdf:
         tmp_pdf.write(await file.read())
         tmp_pdf_path = tmp_pdf.name
@@ -183,24 +174,19 @@ async def extract_questions(file: UploadFile = File(...)):
     image_paths = []
     
     try:
-        # 1. Convert PDF to Images
-        # Uses pypdfium2 - no system dependencies required
         pdf = pdfium.PdfDocument(tmp_pdf_path)
-        n_pages = min(len(pdf), 10) # Cap at 10 pages for performance
+        n_pages = min(len(pdf), 10) 
         
         for i in range(n_pages):
             page = pdf[i]
-            # Scale 2 = 144 DPI (good balance of speed vs OCR quality)
             bitmap = page.render(scale=2)
             pil_image = bitmap.to_pil()
             tmp_img_path = f"/tmp/page_{uuid.uuid4()}_{i}.jpg"
             pil_image.save(tmp_img_path, "JPEG")
             image_paths.append(tmp_img_path)
 
-        # 2. Process with Gemini
         extracted_data = analyze_images_with_gemini(image_paths)
 
-        # 3. Format Response
         final_questions = []
         for q in extracted_data:
             final_questions.append(Question(
@@ -208,7 +194,7 @@ async def extract_questions(file: UploadFile = File(...)):
                 number=str(q.get("number", "?")),
                 type=q.get("type", "text"),
                 content=q.get("content", ""),
-                marks=int(q.get("marks", 0)), # Default to 0 if not found
+                marks=int(q.get("marks", 0)),
                 isMath=q.get("isMath", False),
                 hasImage=q.get("hasImage", False),
                 image_base64=q.get("image_base64", None)
@@ -222,7 +208,6 @@ async def extract_questions(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
     
     finally:
-        # Cleanup temporary files
         if os.path.exists(tmp_pdf_path):
             os.remove(tmp_pdf_path)
         for p in image_paths:
@@ -236,31 +221,31 @@ async def solve_question(request: SolveRequest):
         
     model = genai.GenerativeModel('gemini-2.5-flash')
     
-    # Updated Prompt for "Exam Script" Style with STRICT NO-MARKDOWN enforcement
+    # Updated Prompt for "Exam Script" Style
     prompt = f"""
     You are an exemplary student answering an examination question. Provide a solution that earns full marks.
 
     **Question:**
     {request.content}
     
-    **Strict Formatting Rules (CRITICAL):**
-    1. **ABSOLUTELY NO MARKDOWN:** - Do NOT use double asterisks `**` for bolding.
-       - Do NOT use `##` for headers.
-       - Do NOT use `*` for italics.
-       - Do NOT use `> blockquotes`.
-    2. **Use LaTeX for Formatting:**
-       - For **Bold text**, use `\\textbf{{text}}`.
-       - For *Italic text*, use `\\textit{{text}}`.
-       - For Underlining, use `\\underline{{text}}`.
-    3. **Mathematics:**
+    **Strict Formatting Rules (CRITICAL - NO MARKDOWN):**
+    1. **NO Markdown:** Do NOT use `**bold**`, `## Headers`, `*italics*`, or `> quotes`. The display engine DOES NOT support Markdown. 
+       - Use LaTeX `\\textbf{{Title}}` for headings or emphasis.
+       - Use LaTeX `\\underline{{text}}` for underlining.
+       - Use plain text for normal paragraphs.
+    2. **Mathematics & Problem Solving:**
+       - Structure the answer as a logical flow of steps (e.g., "Step 1:", "Step 2:").
        - Use LaTeX for ALL mathematical expressions (enclosed in $...$ or $$...$$).
-       - Structure the answer as a logical flow of steps.
-    4. **Structure:**
-       - Use plain text for paragraphs.
-       - Use a simple hyphen `-` for bullet points.
+       - Keep explanations concise; focus on the mathematical derivation.
+       - State the final result clearly at the end.
+    3. **Theory & Explanations:**
+       - Provide a DETAILED, comprehensive answer.
+       - Use clear paragraphs.
+       - Use bullet points by starting lines with a simple hyphen `-`.
+       - Explain key concepts thoroughly as if writing for a high-scoring exam.
     
     **Output Style:**
-    Produce a raw text string that renders beautifully when passed to a LaTeX renderer. Do not include conversational filler. Start directly with the answer.
+    Produce a raw text string that renders beautifully when passed to a LaTeX renderer. Do not include conversational filler like "Here is the solution". Start directly with the answer.
     """
     
     content_parts = [prompt]
@@ -286,3 +271,4 @@ async def solve_question(request: SolveRequest):
 
 if __name__ == "__main__":
     import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
