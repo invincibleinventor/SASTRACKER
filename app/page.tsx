@@ -15,6 +15,7 @@ let feedCache = {
   scrollPos: 0
 };
 
+
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -35,14 +36,26 @@ const LatexRenderer = ({ text }: { text: string }) => {
     if (!text || !containerRef.current) return;
     if (isLoaded) {
       try {
-        const parts = text.split(/(\$\$[\s\S]+?\$\$|\$[\s\S]+?\$|`[\s\S]+?`)/g);
+        // Regex explains:
+        // 1. $$...$$ (Block)
+        // 2. \[...\] (Block)
+        // 3. \begin{...}...\end{...} (Raw Environments like Array/Matrix)
+        // 4. $...$ (Inline)
+        // 5. `...` (Backticks)
+        const parts = text.split(/(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\begin\{[a-zA-Z]+\}[\s\S]*?\\end\{[a-zA-Z]+\}|\$[\s\S]+?\$|`[\s\S]+?`)/g);
+        
         containerRef.current.innerHTML = '';
         parts.forEach(part => {
           if (part.startsWith('$$') && part.endsWith('$$')) {
-             const span = document.createElement('div');
+             const div = document.createElement('div');
              const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\'); 
-             (window as any).katex.render(cleanMath, span, { displayMode: true, throwOnError: false }); 
-             containerRef.current?.appendChild(span);
+             (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false }); 
+             containerRef.current?.appendChild(div);
+          } else if (part.startsWith('\\begin')) {
+             // Handle raw LaTeX environments
+             const div = document.createElement('div');
+             (window as any).katex.render(part, div, { displayMode: true, throwOnError: false }); 
+             containerRef.current?.appendChild(div);
           } else if (part.startsWith('$') && part.endsWith('$')) {
             const span = document.createElement('span');
             const cleanMath = part.slice(1, -1).replace(/\\\\/g, '\\');
@@ -54,20 +67,23 @@ const LatexRenderer = ({ text }: { text: string }) => {
             (window as any).katex.render(cleanMath, span, { throwOnError: false }); 
             containerRef.current?.appendChild(span);
           } else {
-            containerRef.current?.appendChild(document.createTextNode(part));
+            // Render HTML tags properly
+            const span = document.createElement('span');
+            span.innerHTML = part;
+            containerRef.current?.appendChild(span);
           }
         });
       } catch (e) {
         containerRef.current.innerText = text;
       }
     } else {
-      containerRef.current.innerText = text;
+      // Fallback before load
+      containerRef.current.innerHTML = text;
     }
   }, [text, isLoaded]);
 
   return <div ref={containerRef} className="hide-scrollbar overflow-x-auto latex-content inline-block w-full break-words" />;
 };
-
 export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,8 +95,12 @@ export default function Home() {
     date: searchParams.get('date') || '',
     marks: searchParams.get('marks') || ''
   });
-  const [groupBy, setGroupBy] = useState(searchParams.get('group') || '');
+  // Input State
+  const [groupByInput, setGroupByInput] = useState(searchParams.get('group') || '');
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+
+  // Committed State (from URL)
+  const activeGroupBy = searchParams.get('group') || '';
 
   const [displayQuestions, setDisplayQuestions] = useState<any[]>([]);
   const [papers, setPapers] = useState<any[]>([]);
@@ -91,7 +111,6 @@ export default function Home() {
   const [hasSearched, setHasSearched] = useState(false);
   const ITEMS_PER_PAGE = 10;
 
-  // Fetch Subjects
   useEffect(() => {
     if (filters.year) {
         supabase.from('subjects').select('subject_name').eq('academic_year', filters.year)
@@ -99,7 +118,6 @@ export default function Home() {
     }
   }, [filters.year]);
 
-  // Fetch Papers (Initial View)
   useEffect(() => {
     const fetchPapers = async () => {
       const { data, error } = await supabase
@@ -127,7 +145,6 @@ export default function Home() {
         return;
     }
 
-    // If no active search/filter, don't fetch questions (stay on papers view)
     if (!currentQuery && !currentFilters.year && !currentFilters.subject && !currentFilters.exam && !currentFilters.date && !currentFilters.marks && !currentGroup) {
         setHasSearched(false);
         return;
@@ -160,7 +177,6 @@ export default function Home() {
         if (currentFilters.date && currentGroup !== 'date') query = query.eq('papers.exam_year', currentFilters.date);
         if (currentFilters.marks) query = query.eq('marks', currentFilters.marks);
 
-        // Apply Grouping Sorts
         if (currentGroup === 'year') query = query.order('academic_year', { foreignTable: 'papers', ascending: true });
         if (currentGroup === 'subject') query = query.order('subject', { foreignTable: 'papers', ascending: true });
         if (currentGroup === 'exam') query = query.order('exam_type', { foreignTable: 'papers', ascending: true });
@@ -212,7 +228,6 @@ export default function Home() {
     setIsLoading(false);
   }, [page, displayQuestions]);
 
-  // Sync URL with State
   useEffect(() => {
     const urlFilters = {
         year: searchParams.get('year') || '',
@@ -226,7 +241,7 @@ export default function Home() {
     
     setFilters(urlFilters);
     setSearchQuery(q);
-    setGroupBy(g);
+    setGroupByInput(g); // Sync input
 
     if (q || urlFilters.year || urlFilters.subject || urlFilters.exam || urlFilters.date || urlFilters.marks || g) {
         fetchQuestions(urlFilters, q, g, true);
@@ -251,7 +266,8 @@ export default function Home() {
   };
 
   const handleSearchClick = () => {
-    updateUrl(filters, searchQuery, groupBy);
+    // Pass the input state to the URL
+    updateUrl(filters, searchQuery, groupByInput);
   };
 
   const handleTagClick = (e: React.MouseEvent, key: string, val: string) => {
@@ -266,7 +282,7 @@ export default function Home() {
     };
     setFilters(newFilters);
     setSearchQuery(''); 
-    setGroupBy('');
+    setGroupByInput('');
     updateUrl(newFilters, '', '');
   };
 
@@ -279,14 +295,14 @@ export default function Home() {
         marks: ''
     };
     setFilters(newFilters);
-    setGroupBy('');
+    setGroupByInput('');
     updateUrl(newFilters, '', '');
   };
 
   const handleBackToPapers = () => {
     setFilters({ year: '', subject: '', exam: '', date: '', marks: '' });
     setSearchQuery('');
-    setGroupBy('');
+    setGroupByInput('');
     setHasSearched(false);
     router.push('/');
   };
@@ -328,14 +344,12 @@ export default function Home() {
             <Search className="absolute left-4 top-4 text-zinc-500" size={20} />
         </div>
 
-        {/* UPDATED GRID LAYOUT */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 items-end">
-          {/* Group By */}
           <div className="col-span-2 md:col-span-1 lg:col-span-1">
                 <div className="flex items-center gap-2 text-zinc-500 text-[10px] uppercase font-bold mb-2">
                     <Layers size={12} /> Group By
                 </div>
-                <select className={styles.input + " border-l-4 border-l-red-600"} value={groupBy} onChange={e => setGroupBy(e.target.value)}>
+                <select className={styles.input + " border-l-4 border-l-red-600"} value={groupByInput} onChange={e => setGroupByInput(e.target.value)}>
                     <option value="">None</option>
                     <option value="year">Year</option>
                     <option value="subject">Subject</option>
@@ -344,12 +358,11 @@ export default function Home() {
                 </select>
           </div>
 
-          {/* Filters */}
           <select 
             className={styles.input} 
             value={filters.year} 
             onChange={e => setFilters({...filters, year: e.target.value, subject: ''})}
-            disabled={groupBy === 'year'}
+            disabled={groupByInput === 'year'}
           >
             <option value="">Year...</option>
             <option value="First Year">First Year</option>
@@ -362,7 +375,7 @@ export default function Home() {
             className={styles.input} 
             value={filters.subject} 
             onChange={e => setFilters({...filters, subject: e.target.value})} 
-            disabled={!filters.year || groupBy === 'subject'}
+            disabled={!filters.year || groupByInput === 'subject'}
           >
             <option value="">Subject...</option>
             {filterSubjects.map(s => <option key={s} value={s}>{s}</option>)}
@@ -372,7 +385,7 @@ export default function Home() {
             className={styles.input} 
             value={filters.exam} 
             onChange={e => setFilters({...filters, exam: e.target.value})}
-            disabled={groupBy === 'exam'}
+            disabled={groupByInput === 'exam'}
           >
             <option value="">Exam...</option>
             {['CIA - 1', 'CIA - 2', 'CIA - 3', 'End Sem', 'Lab Cia', 'End Sem Lab'].map(t => <option key={t} value={t}>{t}</option>)}
@@ -384,7 +397,7 @@ export default function Home() {
             placeholder="Year" 
             value={filters.date} 
             onChange={e => setFilters({...filters, date: e.target.value})} 
-            disabled={groupBy === 'date'}
+            disabled={groupByInput === 'date'}
           />
 
           <select className={styles.input} value={filters.marks} onChange={e => setFilters({...filters, marks: e.target.value})}>
@@ -442,10 +455,10 @@ export default function Home() {
 
         {/* VIEW 2: QUESTIONS FEED */}
         {hasSearched && displayQuestions.map((q, index) => {
-            // Group Headers
-            const currentGroup = groupBy ? getGroupLabel(q, groupBy) : null;
-            const prevGroup = (index > 0 && groupBy) ? getGroupLabel(displayQuestions[index - 1], groupBy) : null;
-            const showHeader = groupBy && currentGroup !== prevGroup;
+            // Calculate Group Headers using activeGroupBy (URL state)
+            const currentGroup = activeGroupBy ? getGroupLabel(q, activeGroupBy) : null;
+            const prevGroup = (index > 0 && activeGroupBy) ? getGroupLabel(displayQuestions[index - 1], activeGroupBy) : null;
+            const showHeader = activeGroupBy && currentGroup !== prevGroup;
 
             return (
                 <React.Fragment key={q.id}>
@@ -510,17 +523,10 @@ export default function Home() {
         
         {hasSearched && displayQuestions.length > 0 && hasMore && (
             <div className="flex justify-center pt-8">
-                <button onClick={() => fetchQuestions(filters, searchQuery, groupBy, false)} className="flex items-center gap-2 text-zinc-500 hover:text-white text-xs uppercase font-bold transition-colors" disabled={isLoading}>
+                <button onClick={() => fetchQuestions(filters, searchQuery, groupByInput, false)} className="flex items-center gap-2 text-zinc-500 hover:text-white text-xs uppercase font-bold transition-colors" disabled={isLoading}>
                     {isLoading ? <Loader2 size={16} className="animate-spin" /> : "Load More"}
                 </button>
             </div>
-        )}
-
-        {hasSearched && !isLoading && displayQuestions.length === 0 && (
-             <div className="flex flex-col items-center justify-center h-64 text-zinc-600">
-                <p className="text-sm font-mono uppercase">No questions found.</p>
-                <button onClick={handleBackToPapers} className="text-red-500 hover:text-white text-xs font-bold uppercase mt-4">Back to Papers</button>
-             </div>
         )}
       </div>
     </div>
