@@ -39,7 +39,7 @@ export default function Navbar() {
         <Link href="/" className="flex items-center space-x-3 cursor-pointer group">
         <img className="w-8 h-8 mx-3 object-fit aspect-square no-shrink" src="/logo.png"></img>
          
-          <span className="text-xl font-black tracking-tighter text-white uppercase italic">
+          <span className="text-xl hidden lg:inline-block font-black tracking-tighter text-white uppercase italic">
             SASTRACKER<span className="text-red-600">.</span>
           </span>
         </Link>
@@ -66,7 +66,7 @@ export default function Navbar() {
             {user ? (
               <>
               <Link href={'/dashboard'} className='flex flex-row items-center content-center gap-2'>
-              <img className='w-5 h-5 rounded-full' src={user.user_metadata?.avatar_url}></img>
+              <img className='w-5 h-5 rounded-full shrink-0 aspect-square' src={user.user_metadata?.avatar_url}></img>
                 <span className="text-zinc-400 text-xs font-medium hover:cursor-pointer font-mono hidden md:block">{user.email.substring(0, user.email.indexOf("@"))}</span>
               </Link>
                           <div className="h-4 ml-2 w-px bg-zinc-800"></div>
