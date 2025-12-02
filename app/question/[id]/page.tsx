@@ -124,7 +124,7 @@ export default function QuestionDetailPage() {
         .eq('question_id', id)
         .maybeSingle();
       
-      if (aiData) setAiAnswer(aiData.content);
+      if (aiData){ setAiAnswer(aiData.content);setAiAnswer(aiData.content);}
 
       // 4. User specific data
       if (user) {
