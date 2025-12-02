@@ -238,11 +238,11 @@ export default function Home() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <div className="bg-black border border-zinc-800 p-6 mb-8 lg:sticky top-20 z-40 shadow-2xl shadow-black">
+      <div className="bg-black border border-zinc-800 p-6 mb-8 sticky top-20 z-40 shadow-2xl shadow-black">
         <div className="mb-6 relative">
             <input 
                 type="text" 
-                className="w-full lg:text-base text-sm bg-zinc-900 border border-zinc-700 p-4 pl-12 text-white placeholder-zinc-500 focus:border-red-600 outline-none transition-colors"
+                className="w-full bg-zinc-900 border border-zinc-700 p-4 pl-12 text-white placeholder-zinc-500 focus:border-red-600 outline-none transition-colors"
                 placeholder="Search across all questions (e.g., 'Resultant', 'Routhe Array')..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -316,13 +316,13 @@ export default function Home() {
             </div>
             
             <div className="flex items-center justify-between border-t border-zinc-900 pt-4 mt-4 ml-16">
-               <span className="text-zinc-500 group-hover:text-red-500 flex items-center gap-2 text-[10px] lg:text-xs uppercase font-bold transition-colors">
-                 <span className='hidden lg:inline-block'>View</span>Solution <ArrowRight size={14} />
+               <span className="text-zinc-500 group-hover:text-red-500 flex items-center gap-2 text-xs uppercase font-bold transition-colors">
+                 View Solution <ArrowRight size={14} />
                </span>
                <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1 border border-zinc-800">
                  <Star size={12} className="text-amber-500 fill-amber-500" />
-                 <span className="text-[10px] lg:text-xs font-mono font-bold text-zinc-300">
-                    <span className="hidden lg:inline-block">Avg</span> Diff: {q.avg_rating > 0 ? q.avg_rating.toFixed(1) : "N/A"} / 5
+                 <span className="text-xs font-mono font-bold text-zinc-300">
+                    Avg Diff: {q.avg_rating > 0 ? q.avg_rating.toFixed(1) : "N/A"} / 5
                  </span>
                </div>
             </div>
