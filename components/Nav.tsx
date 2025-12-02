@@ -69,7 +69,7 @@ export default function Navbar() {
               <img className='w-5 h-5 rounded-full shrink-0 aspect-square' src={user.user_metadata?.avatar_url}></img>
                 <span className="text-zinc-400 text-xs font-medium hover:cursor-pointer font-mono hidden md:block">{user.email.substring(0, user.email.indexOf("@"))}</span>
               </Link>
-                          <div className="h-4 ml-2 w-px bg-zinc-800"></div>
+                          <div className="h-4 ml-3 w-px bg-zinc-800"></div>
 
                 <button onClick={handleLogout} className="text-zinc-500 hover:text-red-500 transition-colors" title="Logout">
                   <LogOut size={16} />

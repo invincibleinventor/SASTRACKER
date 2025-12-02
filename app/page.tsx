@@ -489,7 +489,7 @@ export default function Home() {
                                 <span className="text-zinc-500 font-black text-lg block">Q{q.question_number}</span>
                             </div>
                             <div className="flex-1 min-w-0">
-                                <div className="text-gray-300 text-sm font-light leading-relaxed mb-4">
+                                <div className="text-gray-300 text-base font-sans font-light leading-relaxed mb-4">
                                     <LatexRenderer text={q.content} />
                                     {q.image_path && (
                                         <div className="mt-4 border border-zinc-800 bg-zinc-900/50 p-2 inline-block">

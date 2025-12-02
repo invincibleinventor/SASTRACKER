@@ -306,7 +306,7 @@ export default function QuestionDetailPage() {
         {/* Question Card */}
         <div className="bg-zinc-900 border border-zinc-800 p-8 mb-8 relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-red-600 to-pink-600"></div>
-          <div className="absolute top-4 right-4 text-xs font-mono border border-zinc-700 px-2 py-1 text-zinc-400">
+          <div className="lg:absolute w-max  mb-8 lg:mb-0 top-4 right-4 text-xs font-mono border border-zinc-700 px-2 py-1 text-zinc-400">
             Q{question.question_number} • {question.marks || 0} Marks
           </div>
           
