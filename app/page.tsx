@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
-import { Filter, Search, Star, ArrowRight, Loader2, FileText, Calendar, GraduationCap } from 'lucide-react';
+import { Filter, Search, Star, ArrowRight, Loader2, Image as ImageIcon, Bot } from 'lucide-react';
 
 
 const supabase = createPagesBrowserClient();
@@ -14,6 +14,7 @@ let feedCache = {
   hasMore: true,
   scrollPos: 0
 };
+
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -68,6 +69,7 @@ const LatexRenderer = ({ text }: { text: string }) => {
 
   return <div ref={containerRef} className="latex-content hide-scrollbar overflow-x-auto inline-block w-full break-words" />;
 };
+
 export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -82,7 +84,6 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
 
   const [displayQuestions, setDisplayQuestions] = useState<any[]>([]);
-  const [papers, setPapers] = useState<any[]>([]); // State for storing papers list
   const [isLoading, setIsLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [filterSubjects, setFilterSubjects] = useState<string[]>([]);
@@ -97,22 +98,6 @@ export default function Home() {
     }
   }, [filters.year]);
 
-  // Fetch available papers on mount
-  useEffect(() => {
-    const fetchPapers = async () => {
-      const { data, error } = await supabase
-        .from('papers')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50); // Fetch latest 50 papers
-      
-      if (!error && data) {
-        setPapers(data);
-      }
-    };
-    fetchPapers();
-  }, []);
-
   const fetchQuestions = useCallback(async (currentFilters: any, currentQuery: string, isNewSearch = false) => {
     const queryKey = JSON.stringify({ ...currentFilters, q: currentQuery });
 
@@ -122,14 +107,10 @@ export default function Home() {
         setPage(feedCache.page);
         setHasMore(feedCache.hasMore);
         setHasSearched(true);
-
         return;
     }
 
-    if (!currentQuery && !currentFilters.year && !currentFilters.subject && !currentFilters.exam && !currentFilters.date && !currentFilters.marks) {
-        setHasSearched(false); // Reset search state if filters cleared
-        return;
-    }
+    if (!currentQuery && !currentFilters.year && !currentFilters.subject && !currentFilters.exam && !currentFilters.date && !currentFilters.marks) return;
 
     setIsLoading(true);
     const currentPage = isNewSearch ? 0 : page;
@@ -147,8 +128,9 @@ export default function Home() {
         }
         error = rpcError;
     } else {
+        // Updated to include ai_answers(id) to check existence
         let query = supabase.from('questions')
-            .select(`*, papers!inner (academic_year, subject, exam_type, exam_year)`)
+            .select(`*, ai_answers(id), papers!inner (academic_year, subject, exam_type, exam_year)`)
             .range(from, to);
 
         if (currentFilters.year) query = query.eq('papers.academic_year', currentFilters.year);
@@ -169,7 +151,9 @@ export default function Home() {
             subject: q.subject || q.papers?.subject,
             exam_type: q.exam_type || q.papers?.exam_type,
             exam_year: q.exam_year || q.papers?.exam_year,
-            avg_rating: q.avg_rating || 0
+            avg_rating: q.avg_rating || 0,
+            // Check if AI answer exists (either via RPC boolean or Join array)
+            isAiAnswered: q.has_ai_solution === true || (q.ai_answers && q.ai_answers.length > 0)
         }));
 
         if (isNewSearch) {
@@ -217,8 +201,6 @@ export default function Home() {
 
     if (q || urlFilters.year || urlFilters.subject || urlFilters.exam || urlFilters.date || urlFilters.marks) {
         fetchQuestions(urlFilters, q, true);
-    } else {
-        setHasSearched(false); // Ensure we revert to papers list if URL is cleared
     }
   }, [searchParams]);
 
@@ -257,19 +239,6 @@ export default function Home() {
     updateUrl(newFilters, '');
   };
 
-  // Handle clicking a Paper Card -> Sets filters
-  const handlePaperClick = (paper: any) => {
-    const newFilters = {
-        year: paper.academic_year,
-        subject: paper.subject,
-        exam: paper.exam_type,
-        date: paper.exam_year,
-        marks: ''
-    };
-    setFilters(newFilters);
-    updateUrl(newFilters, '');
-  };
-
   const navigateToDetail = (id: string) => {
     feedCache.scrollPos = window.scrollY;
     router.push(`/question/${id}`);
@@ -282,12 +251,12 @@ export default function Home() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6 hide-scrollbar">
+    <div className="max-w-7xl mx-auto p-6">
       <div className="bg-black border border-zinc-800 p-6 mb-8 lg:sticky top-20 z-40 shadow-2xl shadow-black">
         <div className="mb-6 relative">
             <input 
                 type="text" 
-                className="w-full text-xs bg-zinc-900 border border-zinc-700 p-4 pl-12 text-white placeholder-zinc-500 focus:border-red-600 outline-none transition-colors"
+                className="w-full lg:text-base text-sm bg-zinc-900 border border-zinc-700 p-4 pl-12 text-white placeholder-zinc-500 focus:border-red-600 outline-none transition-colors"
                 placeholder="Search across all questions (e.g., 'Resultant', 'Routhe Array')..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -322,55 +291,29 @@ export default function Home() {
       </div>
 
       <div className="space-y-4 min-h-[50vh]">
-        {/* 1. PAPERS LIST (SHOWN WHEN NO FILTERS ARE ACTIVE) */}
         {!hasSearched && !isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in duration-500">
-             {papers.length > 0 ? (
-                 papers.map(paper => (
-                     <div 
-                        key={paper.id} 
-                        onClick={() => handlePaperClick(paper)}
-                        className="bg-black border border-zinc-800 p-6 hover:border-red-900/50 hover:bg-zinc-900/10 cursor-pointer transition-all group relative"
-                     >
-                         <div className="absolute top-4 right-4 opacity-50 group-hover:opacity-100 transition-opacity">
-                             <ArrowRight size={20} className="text-zinc-600 group-hover:text-red-500" />
-                         </div>
-                         
-                         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-600 mb-3">
-                             <GraduationCap size={14} />
-                             {paper.academic_year}
-                         </div>
-                         
-                         <h3 className="text-lg font-black text-white mb-2 line-clamp-2 h-14">
-                             {paper.subject}
-                         </h3>
-                         
-                         <div className="flex items-center gap-4 text-zinc-500 text-sm font-mono mt-4 border-t border-zinc-900 pt-4">
-                             <span className="flex items-center gap-1"><FileText size={12}/> {paper.exam_type}</span>
-                             <span className="flex items-center gap-1"><Calendar size={12}/> {paper.exam_year}</span>
-                         </div>
-                     </div>
-                 ))
-             ) : (
-                 <div className="col-span-full flex flex-col items-center justify-center h-64 text-zinc-600">
-                    <p className="text-sm font-mono uppercase">No Papers Available Yet.</p>
-                 </div>
-             )}
+          <div className="flex flex-col items-center justify-center h-64 text-zinc-600">
+            <Search size={48} className="mb-4 opacity-20" />
+            <p className="text-sm font-mono uppercase">Select Filters or Search</p>
           </div>
         )}
 
-        {/* 2. LOADING STATE */}
-        {isLoading && (
+        {isLoading && hasSearched && displayQuestions.length === 0 && (
              <div className="flex justify-center p-12"><Loader2 size={32} className="animate-spin text-red-600"/></div>
         )}
 
-        {/* 3. QUESTIONS LIST (SHOWN WHEN SEARCHED) */}
-        {hasSearched && !isLoading && displayQuestions.map(q => (
-          <div key={q.id} onClick={() => navigateToDetail(q.id)} className="hide-scrollbar bg-black border border-zinc-800 p-6 hover:border-red-900/40 cursor-pointer transition-colors group relative flex flex-col">
+        {displayQuestions.map(q => (
+          <div key={q.id} onClick={() => navigateToDetail(q.id)} className="bg-black border border-zinc-800 p-6 hover:border-red-900/40 cursor-pointer transition-colors group relative flex flex-col">
             <div className="absolute top-4 right-4 text-zinc-500 font-mono text-xs border border-zinc-800 px-2 py-1">
                {q.marks || 0} Marks
             </div>
             <div className="flex flex-wrap gap-2 mb-4 pr-16">
+              {/* AI Answered Tag */}
+              {q.isAiAnswered && (
+                <span className={`${styles.tag} border-purple-500/50 text-purple-400 hover:bg-purple-900/20 hover:border-purple-500`}>
+                    <Bot size={12} className="mr-1" /> AI Answered
+                </span>
+              )}
               <span onClick={(e) => handleTagClick(e, 'year', q.academic_year)} className={styles.tag}>{q.academic_year}</span>
               <span onClick={(e) => handleTagClick(e, 'subject', q.subject)} className={styles.tag}>{q.subject}</span>
               <span onClick={(e) => handleTagClick(e, 'exam', q.exam_type)} className={styles.tag}>{q.exam_type}</span>
@@ -383,7 +326,7 @@ export default function Home() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                    <div className="text-gray-300 font-sans text-sm font-light leading-relaxed mb-4">
+                    <div className="text-gray-300 text-sm font-light leading-relaxed mb-4">
                     <LatexRenderer text={q.content} />
                     {q.image_path && (
                         <div className="mt-4 border border-zinc-800 bg-zinc-900/50 p-2 inline-block">
@@ -413,7 +356,7 @@ export default function Home() {
           </div>
         ))}
         
-        {hasSearched && displayQuestions.length > 0 && hasMore && (
+        {displayQuestions.length > 0 && hasMore && (
             <div className="flex justify-center pt-8">
                 <button onClick={() => fetchQuestions(filters, searchQuery, false)} className="flex items-center gap-2 text-zinc-500 hover:text-white text-xs uppercase font-bold transition-colors" disabled={isLoading}>
                     {isLoading ? <Loader2 size={16} className="animate-spin" /> : "Load More"}

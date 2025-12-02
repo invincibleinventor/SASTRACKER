@@ -3,9 +3,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation'; 
-import { ArrowLeft, Star, User, Clock, Send, Paperclip, ChevronUp, ChevronDown, Loader2, X, Info, Trash2 } from 'lucide-react';
+import { ArrowLeft, Star, User, Clock, Send, Paperclip, ChevronUp, ChevronDown, Loader2, X, Info, Sparkles, Bot } from 'lucide-react';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 const supabase = createPagesBrowserClient();
+
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -68,27 +69,33 @@ export default function QuestionDetailPage() {
   const [user, setUser] = useState<any>(null);
   const [question, setQuestion] = useState<any>(null);
   const [answers, setAnswers] = useState<any[]>([]);
+  const [aiAnswer, setAiAnswer] = useState<string | null>(null);
   const [userVotes, setUserVotes] = useState<Record<string, number>>({}); 
   const [userRating, setUserRating] = useState<number | null>(null);
   
   const [newAnswer, setNewAnswer] = useState('');
   const [answerImage, setAnswerImage] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generatingAI, setGeneratingAI] = useState(false);
   const [uploading, setUploading] = useState(false);
   const answerFileRef = useRef<HTMLInputElement>(null);
-
+const[server,setServer]=useState('prod');
+  // Check Auth
   useEffect(() => {
+    setServer(process.env.NEXT_PUBLIC_SERVER || 'prod');
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
     });
   }, []);
 
+  // Fetch Data
   useEffect(() => {
     if (!id) return;
 
     const fetchData = async () => {
       setLoading(true);
       
+      // 1. Question
       const { data: qData } = await supabase
         .from('questions')
         .select(`*, papers (academic_year, subject, exam_type, exam_year)`)
@@ -96,12 +103,24 @@ export default function QuestionDetailPage() {
         .single();
       setQuestion(qData);
 
+      // 2. User Answers
       const { data: aData } = await supabase
         .from('answers')
         .select('*')
         .eq('question_id', id)
+        .order('net_votes', { ascending: false });
       setAnswers(aData || []);
 
+      // 3. AI Answer
+      const { data: aiData } = await supabase
+        .from('ai_answers')
+        .select('content')
+        .eq('question_id', id)
+        .maybeSingle();
+      
+      if (aiData) setAiAnswer(aiData.content);
+
+      // 4. User specific data
       if (user) {
         const { data: vData } = await supabase.from('answer_votes').select('answer_id, vote_value').eq('user_id', user.id);
         const votesMap: Record<string, number> = {};
@@ -117,6 +136,45 @@ export default function QuestionDetailPage() {
 
     if (user !== undefined) fetchData(); 
   }, [id, user]);
+
+  // --- Handlers ---
+
+  const handleGenerateAI = async () => {
+    if (!user) return router.push('/auth');
+    setGeneratingAI(true);
+
+    try {
+        // Call your backend
+                const res = await fetch(server=='local'?'http://localhost:8000/solve':'https://sastrackerbackend.vercel.app/solve', {
+
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: question.content,
+                image_url: question.image_path // Pass the image URL if it exists
+            })
+        });
+
+        if (!res.ok) throw new Error("AI Generation Failed");
+        const data = await res.json();
+        const solution = data.solution;
+
+        // Save to DB
+        const { error } = await supabase.from('ai_answers').insert({
+            question_id: id,
+            content: solution
+        });
+
+        if (error) throw error;
+        setAiAnswer(solution);
+        
+    } catch (e) {
+        alert("Failed to generate AI solution. Please try again later.");
+        console.error(e);
+    } finally {
+        setGeneratingAI(false);
+    }
+  };
 
   const handlePostAnswer = async () => {
     if (!user) return router.push('/auth');
@@ -141,7 +199,7 @@ export default function QuestionDetailPage() {
             author_name: user.email?.split('@')[0] || 'Anonymous', 
             image_url: imageUrl,
             net_votes: 0,
-            user_id: user.id // Added user_id
+            user_id: user.id
         }).select();
 
         if (error) throw error;
@@ -153,17 +211,6 @@ export default function QuestionDetailPage() {
         alert(`Failed to post: ${error.message}`);
     } finally {
         setUploading(false);
-    }
-  };
-
-  const handleDeleteAnswer = async (answerId: string) => {
-    if (!confirm("Delete your answer?")) return;
-    try {
-        const { error } = await supabase.from('answers').delete().eq('id', answerId);
-        if (error) throw error;
-        setAnswers(answers.filter(a => a.id !== answerId));
-    } catch (e) {
-        alert("Failed to delete answer.");
     }
   };
 
@@ -198,10 +245,9 @@ export default function QuestionDetailPage() {
   const handleVote = async (answerId: string, type: 1 | -1) => {
     if (!user) return router.push('/auth');
 
-    const currentVote = userVotes[answerId]; // 1, -1, or undefined
+    const currentVote = userVotes[answerId]; 
     let newVoteValue: number | null = type;
     let voteDelta = 0;
-
    
     if (currentVote === type) {
       newVoteValue = null;
@@ -242,6 +288,7 @@ export default function QuestionDetailPage() {
           <ArrowLeft size={20} className="mr-2" /> Back to Bank
         </button>
 
+        {/* Question Card */}
         <div className="bg-zinc-900 border border-zinc-800 p-8 mb-8 relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-red-600 to-pink-600"></div>
           <div className="absolute top-4 right-4 text-xs font-mono border border-zinc-700 px-2 py-1 text-zinc-400">
@@ -285,6 +332,38 @@ export default function QuestionDetailPage() {
           </div>
         </div>
 
+        {/* AI Solution Section */}
+        <div className="mb-10">
+            <div className="flex items-center gap-2 mb-4">
+                <Sparkles size={18} className="text-purple-500" />
+                <h3 className="text-lg font-black text-white uppercase tracking-tighter">AI Solution</h3>
+            </div>
+            
+            {aiAnswer ? (
+                <div className="bg-zinc-900/50 border border-purple-500/30 p-6 rounded-lg">
+                    <div className="flex items-center gap-2 mb-4 text-purple-400 text-xs font-bold uppercase tracking-widest">
+                        <Bot size={16} /> Generated by AI
+                    </div>
+                    <div className="text-gray-300 leading-relaxed">
+                        <LatexRenderer text={aiAnswer} />
+                    </div>
+                </div>
+            ) : (
+                <div className="bg-zinc-900/30 border border-zinc-800 border-dashed p-8 text-center">
+                    <p className="text-zinc-500 text-sm mb-4">No AI solution generated yet.</p>
+                    <button 
+                        onClick={handleGenerateAI}
+                        disabled={generatingAI}
+                        className="bg-white text-black font-bold px-6 py-3 text-xs uppercase hover:bg-purple-500 hover:text-white transition-colors inline-flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {generatingAI ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16} />}
+                        {generatingAI ? "Solving..." : "Generate AI Solution"}
+                    </button>
+                </div>
+            )}
+        </div>
+
+        {/* Human Answers Section */}
         <div className="bg-black border border-zinc-800 p-6 mb-10 shadow-lg">
             <h3 className="text-sm font-black uppercase tracking-widest text-zinc-500 mb-4">Contribute Solution</h3>
             <textarea 
@@ -346,17 +425,10 @@ export default function QuestionDetailPage() {
                 </div>
 
                 <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-zinc-800 p-1 rounded-full"><User size={12} className="text-zinc-400"/></div>
-                            <span className="text-sm font-bold text-zinc-300">{ans.author_name}</span>
-                            <span className="text-xs text-zinc-600 flex items-center gap-1"><Clock size={10}/> {new Date(ans.created_at).toLocaleDateString()}</span>
-                        </div>
-                        {user?.id === ans.user_id && (
-                           <button onClick={() => handleDeleteAnswer(ans.id)} className="text-zinc-600 hover:text-red-500 transition-colors" title="Delete">
-                             <Trash2 size={14} />
-                           </button>
-                        )}
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="bg-zinc-800 p-1 rounded-full"><User size={12} className="text-zinc-400"/></div>
+                        <span className="text-sm font-bold text-zinc-300">{ans.author_name}</span>
+                        <span className="text-xs text-zinc-600 flex items-center gap-1"><Clock size={10}/> {new Date(ans.created_at).toLocaleDateString()}</span>
                     </div>
                     <div className="text-zinc-400 text-sm leading-relaxed mb-3">
                         <LatexRenderer text={ans.content} />

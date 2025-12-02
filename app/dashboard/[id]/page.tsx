@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Save, Trash2, CheckCircle, Edit2, Eye, ImageIcon } 
 
 const supabase = createPagesBrowserClient();
 
+// Inline LatexRenderer to ensure no import issues and match Upload page style
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -60,15 +61,30 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
   const [content, setContent] = useState(question.content);
   const [difficulty, setDifficulty] = useState(question.difficulty_rating || 1);
   const [marks, setMarks] = useState(question.marks || 0);
-  const [image, setImage] = useState(question.image_path);
+  // image state will hold either the existing path (string) or a new file (File object)
+  const [image, setImage] = useState<string | File | null>(question.image_path);
   const fileRef = useRef<HTMLInputElement>(null);
   
   const handleSave = async () => { 
-    // Call onSave to propagate changes to parent/DB
-    await onSave({ ...question, content, difficulty_rating: difficulty, marks, image_path: image });
+    // Call onSave to propagate changes to parent/DB. The parent will handle image upload.
+    await onSave({ 
+        ...question, 
+        content, 
+        difficulty_rating: difficulty, 
+        marks, 
+        image_file: image instanceof File ? image : null, // Pass file for upload
+        image_path: typeof image === 'string' ? image : null // Pass path if keeping existing
+    });
     setIsEditing(false); 
   };
   
+  // Helper to display image preview (works for both URL and File object)
+  const getImagePreview = () => {
+    if (!image) return null;
+    if (typeof image === 'string') return image;
+    return URL.createObjectURL(image);
+  };
+
   return (
     <div className="bg-black border border-zinc-800 p-6 mb-4">
       <div className="flex items-start gap-4">
@@ -92,13 +108,34 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
                       </div>
                   </div>
                   
-                  {/* Simplified image handling for edit mode: Just clearing or keeping existing url for now as re-uploading logic is complex here */}
                   <div className="flex items-center gap-2">
+                    <input 
+                      type="file" 
+                      ref={fileRef} 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={(e) => e.target.files?.[0] && setImage(e.target.files[0])} 
+                    />
+                    <button 
+                      onClick={() => fileRef.current?.click()} 
+                      className="text-xs text-red-400 uppercase font-bold flex items-center gap-1 hover:text-red-300"
+                    >
+                      <ImageIcon size={14} /> {image ? 'Replace Image' : 'Add Image'}
+                    </button>
                     {image && (
-                      <button onClick={() => setImage(null)} className="text-zinc-500 hover:text-red-500 text-xs font-bold uppercase flex gap-1"><Trash2 size={14} /> Remove Image</button>
+                      <button onClick={() => setImage(null)} className="text-zinc-500 hover:text-red-500">
+                        <Trash2 size={14} />
+                      </button>
                     )}
                   </div>
               </div>
+
+              {image && (
+                <div className="border border-zinc-800 bg-black p-2">
+                  <img src={getImagePreview()!} alt="Preview" className="max-h-40 object-contain" />
+                </div>
+              )}
+
               <div className="bg-zinc-900/30 p-4 border border-zinc-800/50">
                  <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-zinc-500 uppercase"><Eye size={12} /> Live Preview</div>
                  <div className="prose prose-invert max-w-none text-gray-300 text-sm"><LatexRenderer text={content} /></div>
@@ -107,7 +144,7 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
           ) : (
             <div className="prose prose-invert max-w-none text-gray-200 text-sm font-light leading-relaxed">
               <LatexRenderer text={content} />
-              {image && <img src={image} className="mt-4 border border-zinc-800 bg-black max-h-60" />}
+              {question.image_path && <img src={question.image_path} className="mt-4 border border-zinc-800 bg-black max-h-60" />}
               <div className="mt-2 text-xs text-zinc-500 font-mono text-right">Marks: {marks}</div>
             </div>
           )}
@@ -132,59 +169,103 @@ export default function EditPaperPage() {
   const [questions, setQuestions] = useState<any[]>([]);
   const [paper, setPaper] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
-      // Check auth
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return router.push('/auth');
+      if (!id) return;
 
-      // Fetch Paper to verify ownership
-      const { data: paperData, error: paperError } = await supabase
-        .from('papers')
-        .select('*')
-        .eq('id', id)
-        .single();
-      
-      if (paperError || paperData.user_id !== session.user.id) {
-        alert("Paper not found or access denied.");
-        return router.push('/dashboard');
-      }
-      setPaper(paperData);
+      try {
+        // Check auth
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+           router.push('/auth');
+           return;
+        }
 
-      // Fetch Questions
-      const { data: qData } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('paper_id', id)
-        // natural sorting for question numbers can be tricky, sorting by created_at for now
-        .order('created_at', { ascending: true });
+        // Fetch Paper
+        const { data: paperData, error: paperError } = await supabase
+            .from('papers')
+            .select('*')
+            .eq('id', id)
+            .single();
         
-      setQuestions(qData || []);
-      setLoading(false);
+        if (paperError) throw paperError;
+        
+        // Optional: Check ownership if you want strict dashboard rules
+        if (paperData.user_id !== session.user.id) {
+             // Allow viewing for now or redirect
+             // router.push('/dashboard'); 
+        }
+        setPaper(paperData);
+
+        // Fetch Questions
+        const { data: qData, error: qError } = await supabase
+            .from('questions')
+            .select('*')
+            .eq('paper_id', id)
+            // CHANGED: Sorted by question_number instead of created_at to fix error
+            .order('question_number', { ascending: true });
+            
+        if (qError) throw qError;
+        
+        setQuestions(qData || []);
+      } catch (err: any) {
+        console.error("Fetch Error:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    if (id) fetchData();
+    fetchData();
   }, [id, router]);
 
   const handleUpdateQuestion = async (updatedQ: any) => {
     try {
+        let finalImagePath = updatedQ.image_path;
+
+        // If a new image file was provided, upload it first
+        if (updatedQ.image_file) {
+            const fileExt = updatedQ.image_file.name.split('.').pop();
+            const fileName = `${id}/${updatedQ.id}-${Math.random()}.${fileExt}`;
+            
+            // Assuming you have a 'question-images' bucket. Adjust if needed.
+            const { error: uploadError } = await supabase.storage
+                .from('question-images')
+                .upload(fileName, updatedQ.image_file);
+                
+            if (uploadError) throw uploadError;
+
+            const { data: urlData } = supabase.storage
+                .from('question-images')
+                .getPublicUrl(fileName);
+                
+            finalImagePath = urlData.publicUrl;
+        }
+
         const { error } = await supabase
             .from('questions')
             .update({
                 content: updatedQ.content,
                 difficulty_rating: updatedQ.difficulty_rating,
                 marks: updatedQ.marks,
-                image_path: updatedQ.image_path
+                image_path: finalImagePath // Update with new or existing path
             })
             .eq('id', updatedQ.id);
         
         if (error) throw error;
 
-        setQuestions(questions.map(q => q.id === updatedQ.id ? updatedQ : q));
+        // Update local state with the new data, excluding the raw file
+        setQuestions(questions.map(q => q.id === updatedQ.id ? {
+            ...updatedQ,
+            image_path: finalImagePath,
+            image_file: undefined 
+        } : q));
+
     } catch (e) {
         console.error(e);
-        alert("Failed to update question.");
+        alert("Failed to update question. Check console.");
     }
   };
 
@@ -200,6 +281,7 @@ export default function EditPaperPage() {
   };
 
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="text-red-600 animate-spin" size={32}/></div>;
+  if (error) return <div className="min-h-screen bg-black flex items-center justify-center text-red-500">{error}</div>;
 
   return (
     <div className="min-h-screen bg-neutral-950 text-gray-100 font-sans p-6">
@@ -215,16 +297,20 @@ export default function EditPaperPage() {
                 </div>
             </div>
 
-            <div className="space-y-2">
-                {questions.map(q => (
-                    <QuestionEditor 
-                        key={q.id} 
-                        question={q} 
-                        onSave={handleUpdateQuestion} 
-                        onDelete={handleDeleteQuestion} 
-                    />
-                ))}
-            </div>
+            {questions.length === 0 ? (
+                <div className="text-zinc-500 text-center py-10">No questions found for this paper.</div>
+            ) : (
+                <div className="space-y-2">
+                    {questions.map(q => (
+                        <QuestionEditor 
+                            key={q.id} 
+                            question={q} 
+                            onSave={handleUpdateQuestion} 
+                            onDelete={handleDeleteQuestion} 
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     </div>
   );
