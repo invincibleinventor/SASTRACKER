@@ -7,17 +7,14 @@ import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 
 const supabase = createPagesBrowserClient();
 
-// --- Enhanced LatexRenderer for HTML + Math ---
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const renderMath = () => {
     if (!containerRef.current || !(window as any).renderMathInElement) return;
     
-    // 1. Inject HTML (Titles, Tables, Lists)
     containerRef.current.innerHTML = text;
     
-    // 2. Render Math over the HTML
     (window as any).renderMathInElement(containerRef.current, {
       delimiters: [
         {left: '$$', right: '$$', display: true},
@@ -31,7 +28,6 @@ const LatexRenderer = ({ text }: { text: string }) => {
   };
 
   useEffect(() => {
-    // Load KaTeX and Auto-Render Extension
     if (!(window as any).katex) {
         const link = document.createElement("link");
         link.rel = "stylesheet";
@@ -86,7 +82,6 @@ export default function QuestionDetailPage() {
   const answerFileRef = useRef<HTMLInputElement>(null);
   const [server, setServer] = useState('prod');
 
-  // Check Auth
   useEffect(() => {
     setServer(process.env.NEXT_PUBLIC_SERVER || 'prod');
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -94,14 +89,12 @@ export default function QuestionDetailPage() {
     });
   }, []);
 
-  // Fetch Data
   useEffect(() => {
     if (!id) return;
 
     const fetchData = async () => {
       setLoading(true);
       
-      // 1. Question
       const { data: qData } = await supabase
         .from('questions')
         .select(`*, papers (academic_year, subject, exam_type, exam_year)`)
@@ -109,7 +102,6 @@ export default function QuestionDetailPage() {
         .single();
       setQuestion(qData);
 
-      // 2. User Answers
       const { data: aData } = await supabase
         .from('answers')
         .select('*')
@@ -117,7 +109,6 @@ export default function QuestionDetailPage() {
         .order('net_votes', { ascending: false });
       setAnswers(aData || []);
 
-      // 3. AI Answer
       const { data: aiData } = await supabase
         .from('ai_answers')
         .select('content')
@@ -126,7 +117,6 @@ export default function QuestionDetailPage() {
       
       if (aiData){ setAiAnswer(aiData.content);setAiAnswer(aiData.content);}
 
-      // 4. User specific data
       if (user) {
         const { data: vData } = await supabase.from('answer_votes').select('answer_id, vote_value').eq('user_id', user.id);
         const votesMap: Record<string, number> = {};
@@ -143,7 +133,6 @@ export default function QuestionDetailPage() {
     if (user !== undefined) fetchData(); 
   }, [id, user]);
 
-  // --- Handlers ---
 
   const handleGenerateAI = async () => {
     if (!user) return router.push('/auth');
@@ -303,7 +292,6 @@ export default function QuestionDetailPage() {
           <ArrowLeft size={20} className="mr-2" /> Back to Bank
         </button>
 
-        {/* Question Card */}
         <div className="bg-zinc-900 border border-zinc-800 p-8 mb-8 relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-red-600 to-pink-600"></div>
           <div className="lg:absolute w-max  mb-8 lg:mb-0 top-4 right-4 text-xs font-mono border border-zinc-700 px-2 py-1 text-zinc-400">

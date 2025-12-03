@@ -36,12 +36,7 @@ const LatexRenderer = ({ text }: { text: string }) => {
     if (!text || !containerRef.current) return;
     if (isLoaded) {
       try {
-        // Regex explains:
-        // 1. $$...$$ (Block)
-        // 2. \[...\] (Block)
-        // 3. \begin{...}...\end{...} (Raw Environments like Array/Matrix)
-        // 4. $...$ (Inline)
-        // 5. `...` (Backticks)
+     
         const parts = text.split(/(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\begin\{[a-zA-Z]+\}[\s\S]*?\\end\{[a-zA-Z]+\}|\$[\s\S]+?\$|`[\s\S]+?`)/g);
         
         containerRef.current.innerHTML = '';
@@ -52,7 +47,6 @@ const LatexRenderer = ({ text }: { text: string }) => {
              (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false }); 
              containerRef.current?.appendChild(div);
           } else if (part.startsWith('\\begin')) {
-             // Handle raw LaTeX environments
              const div = document.createElement('div');
              (window as any).katex.render(part, div, { displayMode: true, throwOnError: false }); 
              containerRef.current?.appendChild(div);
@@ -67,7 +61,6 @@ const LatexRenderer = ({ text }: { text: string }) => {
             (window as any).katex.render(cleanMath, span, { throwOnError: false }); 
             containerRef.current?.appendChild(span);
           } else {
-            // Render HTML tags properly
             const span = document.createElement('span');
             span.innerHTML = part;
             containerRef.current?.appendChild(span);
@@ -77,7 +70,6 @@ const LatexRenderer = ({ text }: { text: string }) => {
         containerRef.current.innerText = text;
       }
     } else {
-      // Fallback before load
       containerRef.current.innerHTML = text;
     }
   }, [text, isLoaded]);
@@ -95,11 +87,9 @@ export default function Home() {
     date: searchParams.get('date') || '',
     marks: searchParams.get('marks') || ''
   });
-  // Input State
+
   const [groupByInput, setGroupByInput] = useState(searchParams.get('group') || '');
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
-
-  // Committed State (from URL)
   const activeGroupBy = searchParams.get('group') || '';
 
   const [displayQuestions, setDisplayQuestions] = useState<any[]>([]);
@@ -241,8 +231,7 @@ export default function Home() {
     
     setFilters(urlFilters);
     setSearchQuery(q);
-    setGroupByInput(g); // Sync input
-
+    setGroupByInput(g);
     if (q || urlFilters.year || urlFilters.subject || urlFilters.exam || urlFilters.date || urlFilters.marks || g) {
         fetchQuestions(urlFilters, q, g, true);
     } else {
@@ -266,7 +255,6 @@ export default function Home() {
   };
 
   const handleSearchClick = () => {
-    // Pass the input state to the URL
     updateUrl(filters, searchQuery, groupByInput);
   };
 
@@ -410,9 +398,7 @@ export default function Home() {
       </div>
 
       <div className="space-y-4 min-h-[50vh]">
-        
-        {/* VIEW 1: PAPERS LIST (No Search/Group) */}
-        {!hasSearched && !isLoading && (
+                {!hasSearched && !isLoading && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in duration-500">
              {papers.length > 0 ? (
                  papers.map(paper => (
@@ -448,14 +434,11 @@ export default function Home() {
           </div>
         )}
 
-        {/* LOADING STATE */}
         {isLoading && (
              <div className="flex justify-center p-12"><Loader2 size={32} className="animate-spin text-red-600"/></div>
         )}
 
-        {/* VIEW 2: QUESTIONS FEED */}
         {hasSearched && displayQuestions.map((q, index) => {
-            // Calculate Group Headers using activeGroupBy (URL state)
             const currentGroup = activeGroupBy ? getGroupLabel(q, activeGroupBy) : null;
             const prevGroup = (index > 0 && activeGroupBy) ? getGroupLabel(displayQuestions[index - 1], activeGroupBy) : null;
             const showHeader = activeGroupBy && currentGroup !== prevGroup;

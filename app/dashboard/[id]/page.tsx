@@ -176,14 +176,12 @@ export default function EditPaperPage() {
       if (!id) return;
 
       try {
-        // Check auth
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
            router.push('/auth');
            return;
         }
 
-        // Fetch Paper
         const { data: paperData, error: paperError } = await supabase
             .from('papers')
             .select('*')
@@ -192,19 +190,15 @@ export default function EditPaperPage() {
         
         if (paperError) throw paperError;
         
-        // Optional: Check ownership if you want strict dashboard rules
         if (paperData.user_id !== session.user.id) {
-             // Allow viewing for now or redirect
-             // router.push('/dashboard'); 
+          router.push('/dashboard');
         }
         setPaper(paperData);
 
-        // Fetch Questions
         const { data: qData, error: qError } = await supabase
             .from('questions')
             .select('*')
             .eq('paper_id', id)
-            // CHANGED: Sorted by question_number instead of created_at to fix error
             .order('question_number', { ascending: true });
             
         if (qError) throw qError;
@@ -225,12 +219,10 @@ export default function EditPaperPage() {
     try {
         let finalImagePath = updatedQ.image_path;
 
-        // If a new image file was provided, upload it first
         if (updatedQ.image_file) {
             const fileExt = updatedQ.image_file.name.split('.').pop();
             const fileName = `${id}/${updatedQ.id}-${Math.random()}.${fileExt}`;
             
-            // Assuming you have a 'question-images' bucket. Adjust if needed.
             const { error: uploadError } = await supabase.storage
                 .from('question-images')
                 .upload(fileName, updatedQ.image_file);
@@ -250,13 +242,12 @@ export default function EditPaperPage() {
                 content: updatedQ.content,
                 difficulty_rating: updatedQ.difficulty_rating,
                 marks: updatedQ.marks,
-                image_path: finalImagePath // Update with new or existing path
+                image_path: finalImagePath
             })
             .eq('id', updatedQ.id);
         
         if (error) throw error;
 
-        // Update local state with the new data, excluding the raw file
         setQuestions(questions.map(q => q.id === updatedQ.id ? {
             ...updatedQ,
             image_path: finalImagePath,

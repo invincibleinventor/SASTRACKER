@@ -254,7 +254,6 @@ export default function UploadPage() {
   const router = useRouter();
   const [server,setServers] = useState('prod');
 
-  // Store user in state so we can use it in handlePublish
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -275,7 +274,7 @@ export default function UploadPage() {
 
   const handlePublish = async (meta: any) => {
     try {
-        if (!user) return; // Safety check
+        if (!user) return; 
 
         if (meta.isCustomSubject) {
             const { data: existingSubs } = await supabase
@@ -309,7 +308,6 @@ export default function UploadPage() {
             return;
         }
 
-        // Insert paper WITH user_id
         const { data: paperData, error: paperError } = await supabase.from('papers').insert({
             academic_year: meta.year,
             subject: meta.subject,

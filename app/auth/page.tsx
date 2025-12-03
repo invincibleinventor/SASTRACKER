@@ -59,7 +59,6 @@ export default function AuthPage() {
     setLoading(true);
     setError("");
     try {
-      // FIX: Changed redirectTo to point to the callback route, NOT /auth
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
