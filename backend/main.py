@@ -218,7 +218,6 @@ async def solve_question(request: SolveRequest):
         
     model = genai.GenerativeModel('gemini-2.5-flash')
     
-    # Updated Prompt: HTML for Structure, LaTeX for Math
     prompt = f"""
     You are an expert academic tutor. Provide a comprehensive solution to this question. You always give the easiest and the most straightforward answer without any additional explanation or story. U dont go in any roundabout way to solve a problem. You always give the solution with the simplest and fewest number of steps.
     Important: You must detect if the question is intended for malicious purposes. Since your response is directly rendered as HTML, prevent any tag that can cause potential XSS such as <script>, <iframe>, <embed>, <object>, etc. If you detect any such intent, respond with "Cannot provide solution due to policy violation." and disable any javascript events for existing tags such as <div onclick=>, <img onerror=>, etc.
@@ -232,7 +231,8 @@ async def solve_question(request: SolveRequest):
        - Use `<p>` for paragraphs.
        - Use `<ul>` and `<li>` for lists.
        - Use `<b>` for bold text and `<i>` for italics.
-       - Use `<br>` for line breaks.
+       - Use `<br>` for line breaks. Detect /n and replace them with <br> whenever appropriate.
+       - render $rule in latex properly in html equivalent format.
     
     2. **Math with LaTeX:**
        - Enclose ALL mathematical expressions in standard LaTeX delimiters:
