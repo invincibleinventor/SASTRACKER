@@ -113,7 +113,7 @@ export default function Home() {
       const { data, error } = await supabase
         .from('papers')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('subject', { ascending: false })
         .limit(50);
       
       if (!error && data) {
