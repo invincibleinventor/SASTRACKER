@@ -83,6 +83,7 @@ def analyze_images_with_gemini(image_paths: List[str]) -> List[dict]:
     You are an expert exam digitizer. 
     Analyze the provided images of a question paper.
     Extract every single question individually.
+    Think twice before you classify sub divisions within a question. There are cases where the same question continues with a single or multiple line breaks in between. Dont treat it as a separate subdivision. Double check this.
     
     Rules:
     1. If a question spans multiple pages, merge it into one.
