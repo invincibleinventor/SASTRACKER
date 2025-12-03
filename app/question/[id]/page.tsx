@@ -6,60 +6,83 @@ import { ArrowLeft, Star, User, Clock, Send, Paperclip, ChevronUp, ChevronDown, 
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 
 const supabase = createPagesBrowserClient();
-
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const renderMath = () => {
-    if (!containerRef.current || !(window as any).renderMathInElement) return;
-    
-    containerRef.current.innerHTML = text;
-    
-    (window as any).renderMathInElement(containerRef.current, {
-      delimiters: [
-        {left: '$$', right: '$$', display: true},
-        {left: '$', right: '$', display: false},
-        {left: '\\(', right: '\\)', display: false},
-        {left: '\\[', right: '\\]', display: true}
-      ],
-      throwOnError: false,
-      ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"] 
-    });
-  };
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    if (!(window as any).katex) {
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
-        document.head.appendChild(link);
+    if ((window as any).katex) { setIsLoaded(true); return; }
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
+    document.head.appendChild(link);
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js";
+    script.onload = () => setIsLoaded(true);
+    document.head.appendChild(script);
+  }, []);
 
-        const script = document.createElement("script");
-        script.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js";
-        script.onload = () => {
-            const autoRender = document.createElement("script");
-            autoRender.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js";
-            autoRender.onload = () => renderMath();
-            document.head.appendChild(autoRender);
-        };
-        document.head.appendChild(script);
+  useEffect(() => {
+    if (!text || !containerRef.current) return;
+    if (isLoaded) {
+      try {
+        const parts = text.split(
+          /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\begin\{[a-zA-Z]+\}[\s\S]*?\\end\{[a-zA-Z]+\}|\$[\s\S]+?\$|`[\s\S]+?`|\\[a-zA-Z@]+(?:\{[\s\S]*?\}){1,3})/g
+        );
+
+        containerRef.current.innerHTML = '';
+        parts.forEach(part => {
+          if (!part) return;
+          const trimmed = part.trim();
+
+          if (part.startsWith('$$') && part.endsWith('$$')) {
+             const div = document.createElement('div');
+             const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\');
+             (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false });
+             containerRef.current?.appendChild(div);
+          } else if (part.startsWith('\\[') && part.endsWith('\\]')) {
+             const div = document.createElement('div');
+             const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\');
+             (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false });
+             containerRef.current?.appendChild(div);
+          } else if (part.startsWith('\\begin')) {
+             const div = document.createElement('div');
+             (window as any).katex.render(part, div, { displayMode: true, throwOnError: false });
+             containerRef.current?.appendChild(div);
+          } else if (part.startsWith('$') && part.endsWith('$')) {
+            const span = document.createElement('span');
+            const cleanMath = part.slice(1, -1).replace(/\\\\/g, '\\');
+            (window as any).katex.render(cleanMath, span, { throwOnError: false });
+            containerRef.current?.appendChild(span);
+          } else if (part.startsWith('`') && part.endsWith('`')) {
+            const span = document.createElement('span');
+            const cleanMath = part.slice(1, -1).replace(/\\\\/g, '\\');
+            (window as any).katex.render(cleanMath, span, { throwOnError: false });
+            containerRef.current?.appendChild(span);
+          } else if (/^\\[a-zA-Z@]+/.test(trimmed)) {
+            const span = document.createElement('span');
+            try {
+              (window as any).katex.render(part, span, { throwOnError: false, displayMode: false });
+              containerRef.current?.appendChild(span);
+            } catch (e) {
+              span.innerText = part;
+              containerRef.current?.appendChild(span);
+            }
+          } else {
+            const span = document.createElement('span');
+            span.innerHTML = part;
+            containerRef.current?.appendChild(span);
+          }
+        });
+      } catch (e) {
+        containerRef.current.innerText = text;
+      }
     } else {
-        renderMath();
+      containerRef.current.innerHTML = text;
     }
-  }, [text]);
+  }, [text, isLoaded]);
 
-  return (
-    <div 
-        ref={containerRef} 
-        className="latex-content prose prose-invert max-w-none 
-                   [&_table]:w-full [&_table]:border-collapse [&_table]:my-4
-                   [&_th]:border [&_th]:border-zinc-700 [&_th]:bg-zinc-900 [&_th]:p-2 [&_th]:text-left
-                   [&_td]:border [&_td]:border-zinc-700 [&_td]:p-2
-                   [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mt-6 [&_h3]:mb-2 [&_h3]:text-white
-                   [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5
-                   overflow-x-auto"
-    >{text}</div>
-  );
+  return <div ref={containerRef} className="hide-scrollbar overflow-x-auto latex-content inline-block w-full break-words" />;
 };
 
 export default function QuestionDetailPage() {

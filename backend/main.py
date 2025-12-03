@@ -232,7 +232,6 @@ async def solve_question(request: SolveRequest):
        - Use `<ul>` and `<li>` for lists.
        - Use `<b>` for bold text and `<i>` for italics.
        - Use `<br>` for line breaks. Detect /n and replace them with <br> whenever appropriate.
-       - render $rule in latex properly in html equivalent format.
     
     2. **Math with LaTeX:**
        - Enclose ALL mathematical expressions in standard LaTeX delimiters:
@@ -243,6 +242,8 @@ async def solve_question(request: SolveRequest):
        - Use standard HTML `<table>`, `<tr>`, `<td>`, `<th>` tags with a `border="1"` attribute for tables (like K-Maps).
        - OR use LaTeX `$$\\begin{{array}}...\\end{{array}}$$` if strictly mathematical.
     
+      SUBJECT SPECIFIC INSTRUCTIONS: 
+      For any question pertaining to machine code, mainly the ones asking you to convert to machine code, the architecture is ARM. And for datapath related questions, assume MIPS.
     **Example Output Format:**
     <h3>Step 1: Analysis</h3>
     <p>The function is given by $f(x) = x^2$. We need to find the derivative.</p>
