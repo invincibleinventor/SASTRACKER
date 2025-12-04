@@ -299,7 +299,7 @@ export default function AuthPage() {
             <FeatureBox 
               icon={<Network className="text-white" size={24} />}
               title="Peer Review"
-              desc="Community voting system ensures the best and most accurate answers float to the top."
+              desc="Community voting system ensures the best and most accurate answers appear at the top."
             />
             
             <FeatureBox 
@@ -322,7 +322,7 @@ export default function AuthPage() {
           </div>
           <div className="space-y-4">
             <FaqItem question="Who can access this platform?" answer="Access is strictly limited to students and faculty with a valid @sastra.ac.in or associated institutional email address." />
-            <FaqItem question="How do I upload a question paper?" answer="Once authenticated, navigate to the Upload section. You can drag and drop PDF files, and the system will automatically extraction questions." />
+            <FaqItem question="How do I upload a question paper?" answer="Once logged in, navigate to the Upload section. You can drag and drop PDF files, and the system will automatically extract the questions individually." />
             <FaqItem question="Can I edit questions if the AI makes a mistake?" answer="Yes. Our review interface allows you to edit text, fix mathematical formulas, and adjust images before the paper is published to the live database." />
             <FaqItem question="Is this an official university portal?" answer="No, this is a student-run initiative designed to help the community organize and preserve academic resources effectively." />
                       <FaqItem question="How do I contribute to SASTRACKER?" answer="You can contribute to us by 4 ways. You can upload any PyQs you find. You can contribute community answers to various questions. You can join us in developing SASTRACKER. And alas, the most important way to support us is to spread the word amongst your friends :)" />
