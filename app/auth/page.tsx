@@ -318,7 +318,7 @@ export default function AuthPage() {
             <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4">
               Frequently Asked Questions
             </h2>
-            <p className="text-zinc-500 font-mono">Common questions regarding SASTRACKER and using it.</p>
+            <p className="text-zinc-500 font-normal">Common questions regarding SASTRACKER and using it.</p>
           </div>
           <div className="space-y-4">
             <FaqItem question="Who can access this platform?" answer="Access is strictly limited to students and faculty with a valid @sastra.ac.in or associated institutional email address." />
