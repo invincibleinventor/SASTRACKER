@@ -271,7 +271,7 @@ export default function AuthPage() {
       </section>
 
       {/* --- FEATURES GRID --- */}
-      <section className="py-32 bg-neutral-950 border-b border-zinc-900">
+      <section className="py-20 lg:py-32 bg-neutral-950 border-b border-zinc-900">
         <div className="max-w-7xl mx-auto px-6">
                   <h1 className='text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-700 mb-10 pl-1 to-zinc-900 font-black uppercase text-3xl'>Our Features</h1>
 
@@ -312,7 +312,7 @@ export default function AuthPage() {
       </section>
 
       {/* --- FAQ SECTION --- */}
-      <section className="py-32 border-b border-zinc-900">
+      <section className="py-20 lg:py-32 border-b border-zinc-900">
         <div className="max-w-4xl mx-auto px-6">
            <div className="mb-16">
             <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4">
