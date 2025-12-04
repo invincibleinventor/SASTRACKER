@@ -19,7 +19,7 @@ export default function RootLayout({
               <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
       <body
-        className={`lg:pb-20 h-full min-h-screen hide-scrollbar lg:min-h-screen bg-neutral-950 space-mono-regular`}
+        className={`h-full min-h-screen hide-scrollbar lg:min-h-screen bg-neutral-950 space-mono-regular`}
       >
   <Nav></Nav>
         {children}
