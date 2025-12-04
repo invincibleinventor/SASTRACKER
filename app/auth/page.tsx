@@ -217,7 +217,7 @@ export default function AuthPage() {
               The Problem
             </h2>
             <p className="text-zinc-400 text-lg leading-relaxed mb-6">
-              Academic resources are often fragmented. Valuable Question Papers (PYQs) are stored as images, shared on messaging apps, and eventually lost in the digital void.
+              Academic resources are often fragmented. Valuable Question Papers (PyQs) are stored as images, shared on messaging apps, and eventually lost in the digital void.
             </p>
           </div>
           <div>
@@ -225,7 +225,7 @@ export default function AuthPage() {
               Our Solution
             </h2>
             <p className="text-zinc-400 text-lg leading-relaxed mb-6">
-              Sastracker creates a permanent, structured archive. We don't just store files; we extract the content, making every question searchable, sortable, and solvable.
+              Sastracker creates a permanent, structured archive. We don't just store files - we extract the content, making every question searchable, sortable, and solvable.
             </p>
           </div>
         </div>
