@@ -333,9 +333,9 @@ export default function AuthPage() {
       </section>
 
       {/* --- CTA --- */}
-      <section className="py-32">
+      <section className="py-20 lg:py-32">
         <div className="max-w-4xl mx-auto px-6 text-center">
-           <p className="font-sans text-zinc-300 text-base bg-white/10 border border-zinc-800 rounded-none border-dashed py-2 mb-10 ">
+           <p className="font-sans px-6 mx-6 text-zinc-300 text-base bg-white/10 border border-zinc-800 rounded-none border-dashed py-2 mb-10 ">
             We are completely student-run and community-driven. Your participation keeps the archive growing.
           </p>
           <h2 className="text-4xl md:text-6xl font-black text-white uppercase tracking-tighter mb-8">
