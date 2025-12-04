@@ -345,7 +345,7 @@ export default function AuthPage() {
             Join SASTRACKER. Access PyQs. Contribute to the archive. Let the community thrive.
           </p>
           <button 
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={() => window.scrollTo({ top: 240, behavior: 'smooth' })}
             className="bg-gradient-to-r from-red-600 to-pink-600 text-white text-sm font-black px-12 py-4 uppercase tracking-widest hover:bg-red-700 transition-all rounded-none"
           >
             Access SASTRACKER
