@@ -210,7 +210,7 @@ export default function AuthPage() {
       </section>
 
       {/* --- THE PROBLEM STATEMENT --- */}
-      <section className="py-24 border-b border-zinc-900 bg-neutral-950">
+      <section className="lg:py-24 py-16 border-b border-zinc-900 bg-neutral-950">
         <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-16">
           <div>
             <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-800  to-zinc-400  uppercase tracking-tighter mb-6">
@@ -232,7 +232,7 @@ export default function AuthPage() {
       </section>
 
       {/* --- PROCESSING PIPELINE (TIMELINE) --- */}
-      <section id="pipeline" className="py-32 border-b border-zinc-900 relative">
+      <section id="pipeline" className="py-16 lg:py-32 border-b border-zinc-900 relative">
         <div className="max-w-7xl mx-auto px-6">
           <div className="mb-20">
             <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-2">
@@ -271,7 +271,7 @@ export default function AuthPage() {
       </section>
 
       {/* --- FEATURES GRID --- */}
-      <section className="py-20 lg:py-32 bg-neutral-950 border-b border-zinc-900">
+      <section className="py-16 lg:py-32 bg-neutral-950 border-b border-zinc-900">
         <div className="max-w-7xl mx-auto px-6">
                   <h1 className='text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-700 mb-10 pl-1 to-zinc-900 font-black uppercase text-3xl'>Our Features</h1>
 
@@ -312,7 +312,7 @@ export default function AuthPage() {
       </section>
 
       {/* --- FAQ SECTION --- */}
-      <section className="py-20 lg:py-32 border-b border-zinc-900">
+      <section className="py-16 lg:py-32 border-b border-zinc-900">
         <div className="max-w-4xl mx-auto px-6">
            <div className="mb-16">
             <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4">
@@ -333,7 +333,7 @@ export default function AuthPage() {
       </section>
 
       {/* --- CTA --- */}
-      <section className="py-20 lg:py-32">
+      <section className="py-16 lg:py-32">
         <div className="max-w-4xl mx-auto px-6 text-center">
            <p className="font-sans px-6 mx-6 text-zinc-300 text-base bg-white/10 border border-zinc-800 rounded-none border-dashed py-2 mb-10 ">
             We are completely student-run and community-driven. Your participation keeps the archive growing.
