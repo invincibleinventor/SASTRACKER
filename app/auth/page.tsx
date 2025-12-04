@@ -273,7 +273,7 @@ export default function AuthPage() {
       {/* --- FEATURES GRID --- */}
       <section className="py-32 bg-neutral-950 border-b border-zinc-900">
         <div className="max-w-7xl mx-auto px-6">
-                  <h1 className='text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-900 mb-10 pl-1 to-zinc-900 font-black uppercase text-3xl'>Our Features</h1>
+                  <h1 className='text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-700 mb-10 pl-1 to-zinc-900 font-black uppercase text-3xl'>Our Features</h1>
 
           <div className="grid md:grid-cols-3 gap-3">
             <FeatureBox 
@@ -318,7 +318,7 @@ export default function AuthPage() {
             <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4">
               Frequently Asked Questions
             </h2>
-            <p className="text-zinc-500 font-mono">Common queries regarding platform access and usage.</p>
+            <p className="text-zinc-500 font-mono">Common questions regarding SASTRACKER and using it.</p>
           </div>
           <div className="space-y-4">
             <FaqItem question="Who can access this platform?" answer="Access is strictly limited to students and faculty with a valid @sastra.ac.in or associated institutional email address." />
