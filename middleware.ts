@@ -2,9 +2,37 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 
+const STATIC_REGEX = /\.(svg|png|jpg|jpeg|gif|webp|css|js|woff2?|ttf|ico)$/;
+const SASTRA_DOMAINS = ["sastra.ac.in", "sastra.edu"];
 
+function isSastraEmail(email: string): boolean {
+  const lower = email.toLowerCase().trim();
+  return SASTRA_DOMAINS.some((d) => lower.endsWith(d));
+}
 
-const STATIC_AND_ICON_REGEX = /\.(svg|png|jpg|jpeg|gif|webp|css|js|woff2?|ttf)$/;
+const RESUME_AUTH_ROUTES = ["/resumes/submit", "/resumes/fork", "/resumes/diff"];
+const ADMIN_ROUTES = ["/admin"];
+const PYQ_ROUTES = ["/upload", "/dashboard", "/question"];
+
+function matchesRoute(pathname: string, routes: string[]): boolean {
+  return routes.some(r => pathname === r || pathname.startsWith(r + "/"));
+}
+
+function isPublicResumeRoute(pathname: string): boolean {
+  if (pathname === "/resumes") return true;
+  if (pathname.startsWith("/resumes/") && !matchesRoute(pathname, RESUME_AUTH_ROUTES)) {
+    return true;
+  }
+  return false;
+}
+
+function isPublicProjectRoute(pathname: string): boolean {
+  if (pathname === "/projects") return true;
+  if (pathname.startsWith("/projects/") && pathname !== "/projects/submit") {
+    return true;
+  }
+  return false;
+}
 
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
@@ -12,13 +40,13 @@ export async function middleware(req: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/static") ||
-    pathname === "/favicon.ico" ||
-    STATIC_AND_ICON_REGEX.test(pathname)
+    pathname.startsWith("/api") ||
+    STATIC_REGEX.test(pathname)
   ) {
     return NextResponse.next();
   }
 
-  if (pathname === "/auth/callback" || pathname.startsWith("/auth")) {
+  if (pathname === "/auth" || pathname === "/auth/callback") {
     return NextResponse.next();
   }
 
@@ -26,62 +54,83 @@ export async function middleware(req: NextRequest) {
   const supabase = createMiddlewareClient({ req, res });
 
   try {
-    const {
-      data: { session },
-      error: sessionErr,
-    } = await supabase.auth.getSession();
-
-    if (sessionErr) {
-      console.error("Supabase getSession error in middleware:", sessionErr);
-      const url = req.nextUrl.clone();
-      url.pathname = "/auth";
-      return NextResponse.redirect(url);
-    }
-
+    const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user ?? null;
+    const email = user?.email?.toLowerCase().trim() ?? "";
+    const isSastra = isSastraEmail(email);
 
-    if (user) {
-      const allowedDomains = ["sastra.ac.in", "sastra.edu"];
-      const email = (user.email ?? "").toLowerCase().trim();
-      const isAllowed = allowedDomains.some((d) => email.endsWith(d));
-
-      if (!isAllowed) {
-        const redirectUrl = req.nextUrl.clone();
-        redirectUrl.pathname = "/auth";
-        redirectUrl.searchParams.set("invalid_domain", "1");
-
-        const redirectRes = NextResponse.redirect(redirectUrl);
-
-        const supabaseSignOut = createMiddlewareClient({ req, res: redirectRes });
-        try {
-          await supabaseSignOut.auth.signOut();
-        } catch (signOutErr) {
-          console.error("Error signing out in middleware:", signOutErr);
-        }
-
-        return redirectRes;
-      }
-
-      if (pathname.startsWith("/auth")) {
-        const url = req.nextUrl.clone();
-        url.pathname = "/";
-        return NextResponse.redirect(url);
-      }
-
+    if (isPublicResumeRoute(pathname) || isPublicProjectRoute(pathname)) {
       return res;
     }
 
-    const url = req.nextUrl.clone();
-    url.pathname = "/auth";
-    url.searchParams.set("redirect_to", req.nextUrl.pathname);
-    return NextResponse.redirect(url);
+    if (pathname === "/") {
+      return res;
+    }
+
+    if (matchesRoute(pathname, PYQ_ROUTES)) {
+      if (!user) {
+        const url = req.nextUrl.clone();
+        url.pathname = "/auth";
+        url.searchParams.set("redirect_to", pathname);
+        return NextResponse.redirect(url);
+      }
+      if (!isSastra) {
+        const url = req.nextUrl.clone();
+        url.pathname = "/resumes";
+        return NextResponse.redirect(url);
+      }
+      return res;
+    }
+
+    if (matchesRoute(pathname, ADMIN_ROUTES)) {
+      if (!user) {
+        const url = req.nextUrl.clone();
+        url.pathname = "/auth";
+        url.searchParams.set("redirect_to", pathname);
+        url.searchParams.set("admin", "1");
+        return NextResponse.redirect(url);
+      }
+      return res;
+    }
+
+    if (matchesRoute(pathname, RESUME_AUTH_ROUTES)) {
+      if (!user) {
+        const url = req.nextUrl.clone();
+        url.pathname = "/auth";
+        url.searchParams.set("redirect_to", pathname);
+        url.searchParams.set("public", "1");
+        return NextResponse.redirect(url);
+      }
+      return res;
+    }
+
+    if (pathname === "/projects/submit") {
+      if (!user) {
+        const url = req.nextUrl.clone();
+        url.pathname = "/auth";
+        url.searchParams.set("redirect_to", pathname);
+        url.searchParams.set("public", "1");
+        return NextResponse.redirect(url);
+      }
+      return res;
+    }
+
+    if (pathname === "/profile") {
+      if (!user) {
+        const url = req.nextUrl.clone();
+        url.pathname = "/auth";
+        url.searchParams.set("redirect_to", pathname);
+        return NextResponse.redirect(url);
+      }
+      return res;
+    }
+
+    return res;
   } catch (err) {
-    console.error("Middleware unexpected error:", err);
-    const url = req.nextUrl.clone();
-    url.pathname = "/auth";
-    return NextResponse.redirect(url);
+    return res;
   }
 }
+
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|auth/callback).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

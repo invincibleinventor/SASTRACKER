@@ -37,7 +37,6 @@ export default function Dashboard() {
       if (error) throw error;
       setPapers(data || []);
     } catch (error) {
-      console.error("Error fetching papers:", error);
     } finally {
       setLoading(false);
     }
@@ -45,19 +44,18 @@ export default function Dashboard() {
 
   const handleDeletePaper = async (paperId: string) => {
     if (!confirm("Are you sure you want to delete this paper? This action cannot be undone.")) return;
-    
+
     try {
       const { error } = await supabase.from('papers').delete().eq('id', paperId);
       if (error) throw error;
       setPapers(papers.filter(p => p.id !== paperId));
     } catch (error) {
       alert("Failed to delete paper.");
-      console.error(error);
     }
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="text-red-600 animate-spin" size={32}/></div>;
+    return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="text-red-600 animate-spin" size={32} /></div>;
   }
 
   return (
@@ -68,7 +66,7 @@ export default function Dashboard() {
             <h1 className="text-3xl font-black text-white uppercase tracking-tighter">My Dashboard</h1>
             <p className="text-zinc-500 text-sm mt-1">Manage your contributions</p>
           </div>
-          <button 
+          <button
             onClick={() => router.push('/upload')}
             className="bg-zinc-100 text-black font-bold px-4 py-2 text-xs uppercase hover:bg-red-600 hover:text-white transition-colors flex items-center gap-2"
           >
@@ -86,27 +84,27 @@ export default function Dashboard() {
             {papers.map(paper => (
               <div key={paper.id} className="bg-black border border-zinc-800 p-6 hover:border-zinc-600 transition-all group relative flex flex-col">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-600 mb-3">
-                   <GraduationCap size={14} />
-                   {paper.academic_year}
+                  <GraduationCap size={14} />
+                  {paper.academic_year}
                 </div>
-                
+
                 <h3 className="text-lg font-black text-white mb-2 line-clamp-2 h-14">
-                    {paper.subject}
+                  {paper.subject}
                 </h3>
-                
+
                 <div className="flex items-center gap-4 text-zinc-500 text-sm font-mono mt-4 border-t border-zinc-900 pt-4 mb-6">
-                    <span className="flex items-center gap-1"><FileText size={12}/> {paper.exam_type}</span>
-                    <span className="flex items-center gap-1"><Calendar size={12}/> {paper.exam_year}</span>
+                  <span className="flex items-center gap-1"><FileText size={12} /> {paper.exam_type}</span>
+                  <span className="flex items-center gap-1"><Calendar size={12} /> {paper.exam_year}</span>
                 </div>
 
                 <div className="mt-auto flex gap-2">
-                  <button 
+                  <button
                     onClick={() => router.push(`/dashboard/${paper.id}`)}
                     className="flex-1 bg-zinc-900 text-white border border-zinc-700 py-2 text-xs font-bold uppercase hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
                   >
                     <Edit size={14} /> Edit Questions
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleDeletePaper(paper.id)}
                     className="px-3 bg-zinc-900 text-red-500 border border-zinc-700 py-2 hover:bg-red-900/20 hover:border-red-900 transition-colors"
                     title="Delete Paper"

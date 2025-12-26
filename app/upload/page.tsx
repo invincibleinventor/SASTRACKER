@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
+import {
   Upload, FileText, CheckCircle, Edit2, Loader2, Save, Trash2, X, Eye, ImageIcon,
   AlertTriangle
 } from 'lucide-react';
@@ -36,14 +36,14 @@ const LatexRenderer = ({ text }: { text: string }) => {
         containerRef.current.innerHTML = '';
         parts.forEach(part => {
           if (part.startsWith('$$') && part.endsWith('$$')) {
-             const span = document.createElement('div');
-             const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\'); 
-             (window as any).katex.render(cleanMath, span, { displayMode: true, throwOnError: false }); 
-             containerRef.current?.appendChild(span);
+            const span = document.createElement('div');
+            const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\');
+            (window as any).katex.render(cleanMath, span, { displayMode: true, throwOnError: false });
+            containerRef.current?.appendChild(span);
           } else if (part.startsWith('$') && part.endsWith('$')) {
             const span = document.createElement('span');
             const cleanMath = part.slice(1, -1).replace(/\\\\/g, '\\');
-            (window as any).katex.render(cleanMath, span, { throwOnError: false }); 
+            (window as any).katex.render(cleanMath, span, { throwOnError: false });
             containerRef.current?.appendChild(span);
           } else {
             containerRef.current?.appendChild(document.createTextNode(part));
@@ -65,7 +65,7 @@ const PublishModal = ({ isOpen, onClose, onConfirm }: any) => {
   const [customSubject, setCustomSubject] = useState('');
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
-  
+
   const subjectsCache = useRef<Record<string, string[]>>({});
 
   useEffect(() => {
@@ -98,12 +98,12 @@ const PublishModal = ({ isOpen, onClose, onConfirm }: any) => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-black border border-zinc-700 w-full max-w-md p-8 shadow-2xl shadow-red-900/20 relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X size={20}/></button>
+        <button onClick={onClose} className="absolute top-4 right-4 text-zinc-500 hover:text-white"><X size={20} /></button>
         <h2 className="text-2xl font-black text-white uppercase mb-6">Finalize Paper</h2>
         <div className="space-y-4">
           <div>
             <label className="text-zinc-500 text-[10px] uppercase font-bold block mb-2">Academic Year</label>
-            <select className="bg-zinc-900 border border-zinc-700 p-3 text-white w-full text-sm outline-none focus:border-red-600" value={meta.year} onChange={e => setMeta({...meta, year: e.target.value, subject: ''})}>
+            <select className="bg-zinc-900 border border-zinc-700 p-3 text-white w-full text-sm outline-none focus:border-red-600" value={meta.year} onChange={e => setMeta({ ...meta, year: e.target.value, subject: '' })}>
               <option value="">Select Year...</option>
               <option value="First Year">First Year</option>
               <option value="Second Year">Second Year</option>
@@ -111,49 +111,49 @@ const PublishModal = ({ isOpen, onClose, onConfirm }: any) => {
               <option value="Fourth Year">Fourth Year</option>
             </select>
           </div>
-          
+
           <div>
             <label className="text-zinc-500 text-[10px] uppercase font-bold block mb-2">Subject</label>
-            <select 
-                className="bg-zinc-900 border border-zinc-700 p-3 text-white w-full text-sm outline-none focus:border-red-600" 
-                value={meta.subject} 
-                onChange={e => setMeta({...meta, subject: e.target.value})} 
-                disabled={!meta.year}
+            <select
+              className="bg-zinc-900 border border-zinc-700 p-3 text-white w-full text-sm outline-none focus:border-red-600"
+              value={meta.subject}
+              onChange={e => setMeta({ ...meta, subject: e.target.value })}
+              disabled={!meta.year}
             >
               <option value="">{loadingSubjects ? "Loading..." : "Select Subject..."}</option>
               {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
               <option value="Other" className="text-amber-500 font-bold">+ Add New Subject</option>
             </select>
-            
+
             {meta.subject === 'Other' && (
-                <input 
-                    type="text" 
-                    className="mt-2 bg-zinc-900 border border-amber-600/50 p-3 text-white w-full text-sm outline-none focus:border-amber-500" 
-                    placeholder="Enter new subject name..." 
-                    value={customSubject} 
-                    onChange={e => setCustomSubject(e.target.value)} 
-                />
+              <input
+                type="text"
+                className="mt-2 bg-zinc-900 border border-amber-600/50 p-3 text-white w-full text-sm outline-none focus:border-amber-500"
+                placeholder="Enter new subject name..."
+                value={customSubject}
+                onChange={e => setCustomSubject(e.target.value)}
+              />
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-zinc-500 text-[10px] uppercase font-bold block mb-2">Exam Name</label>
-              <select className="bg-zinc-900 border border-zinc-700 p-3 text-white w-full text-sm outline-none focus:border-red-600" value={meta.exam} onChange={e => setMeta({...meta, exam: e.target.value})}>
+              <select className="bg-zinc-900 border border-zinc-700 p-3 text-white w-full text-sm outline-none focus:border-red-600" value={meta.exam} onChange={e => setMeta({ ...meta, exam: e.target.value })}>
                 <option value="">Select Type...</option>
                 {['CIA - 1', 'CIA - 2', 'CIA - 3', 'End Sem', 'Lab Cia', 'End Sem Lab'].map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
               <label className="text-zinc-500 text-[10px] uppercase font-bold block mb-2">Exam Year</label>
-              <input type="number" className="bg-zinc-900 border border-zinc-700 p-3 text-white w-full text-sm outline-none focus:border-red-600" placeholder="2024" value={meta.date} onChange={e => setMeta({...meta, date: e.target.value})} />
+              <input type="number" className="bg-zinc-900 border border-zinc-700 p-3 text-white w-full text-sm outline-none focus:border-red-600" placeholder="2024" value={meta.date} onChange={e => setMeta({ ...meta, date: e.target.value })} />
             </div>
           </div>
         </div>
         <div className="mt-8">
-          <button 
-            onClick={handleConfirm} 
-            disabled={!meta.year || !meta.subject || (meta.subject === 'Other' && !customSubject) || !meta.exam || !meta.date} 
+          <button
+            onClick={handleConfirm}
+            disabled={!meta.year || !meta.subject || (meta.subject === 'Other' && !customSubject) || !meta.exam || !meta.date}
             className="bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold px-6 py-2 w-full uppercase tracking-wider text-xs hover:opacity-90 disabled:opacity-50"
           >
             Save to Database
@@ -171,9 +171,9 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
   const [marks, setMarks] = useState(question.marks || 0);
   const [image, setImage] = useState(question.image);
   const fileRef = useRef<HTMLInputElement>(null);
-  
+
   const handleSave = () => { onSave({ ...question, content, difficulty, marks, image, verified: true }); setIsEditing(false); };
-  
+
   return (
     <div className={`bg-black border border-zinc-800 p-6 mb-4 ${question.verified ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-amber-500'}`}>
       <div className="flex items-start gap-4">
@@ -182,47 +182,47 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
           {isEditing ? (
             <div className="space-y-4">
               <textarea className="bg-zinc-900 border border-zinc-700 p-3 text-white w-full text-sm outline-none focus:border-red-600 font-mono" rows={6} value={content} onChange={(e) => setContent(e.target.value)} />
-              
+
               <div className="flex justify-between items-center border border-zinc-700 p-2 bg-zinc-900/50">
-                  <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold text-zinc-500">Difficulty</span>
-                          <select className="bg-black text-white text-xs border border-zinc-700" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))}>
-                              {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
-                          </select>
-                      </div>
-                      <div className="flex items-center gap-2">
-                          <span className="text-[10px] uppercase font-bold text-zinc-500">Marks</span>
-                          <input type="number" className="bg-black text-white text-xs border border-zinc-700 w-16 p-1" value={marks} onChange={e => setMarks(Number(e.target.value))} />
-                      </div>
-                  </div>
-                  
+                <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <input 
-                      type="file" 
-                      ref={fileRef} 
-                      className="hidden" 
-                      accept="image/*" 
-                      onChange={(e) => {
-                        if (e.target.files?.[0]) {
-                          const reader = new FileReader();
-                          reader.onload = (ev) => setImage(ev.target?.result);
-                          reader.readAsDataURL(e.target.files[0]);
-                        }
-                      }} 
-                    />
-                    <button onClick={() => fileRef.current?.click()} className="text-xs text-red-400 uppercase font-bold flex items-center gap-1 hover:text-red-300">
-                      <ImageIcon size={14} /> {image ? 'Replace' : 'Add'}
-                    </button>
-                    {image && (
-                      <button onClick={() => setImage(null)} className="text-zinc-500 hover:text-red-500"><Trash2 size={14} /></button>
-                    )}
+                    <span className="text-[10px] uppercase font-bold text-zinc-500">Difficulty</span>
+                    <select className="bg-black text-white text-xs border border-zinc-700" value={difficulty} onChange={e => setDifficulty(Number(e.target.value))}>
+                      {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500">Marks</span>
+                    <input type="number" className="bg-black text-white text-xs border border-zinc-700 w-16 p-1" value={marks} onChange={e => setMarks(Number(e.target.value))} />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    ref={fileRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => setImage(ev.target?.result);
+                        reader.readAsDataURL(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <button onClick={() => fileRef.current?.click()} className="text-xs text-red-400 uppercase font-bold flex items-center gap-1 hover:text-red-300">
+                    <ImageIcon size={14} /> {image ? 'Replace' : 'Add'}
+                  </button>
+                  {image && (
+                    <button onClick={() => setImage(null)} className="text-zinc-500 hover:text-red-500"><Trash2 size={14} /></button>
+                  )}
+                </div>
               </div>
               {image && <div className="border border-zinc-800 bg-black p-2"><img src={image} alt="Preview" className="max-h-40 object-contain" /></div>}
               <div className="bg-zinc-900/30 p-4 border border-zinc-800/50">
-                 <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-zinc-500 uppercase"><Eye size={12} /> Live Preview</div>
-                 <div className="prose prose-invert max-w-none text-gray-300 text-sm"><LatexRenderer text={content} /></div>
+                <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-zinc-500 uppercase"><Eye size={12} /> Live Preview</div>
+                <div className="prose prose-invert max-w-none text-gray-300 text-sm"><LatexRenderer text={content} /></div>
               </div>
             </div>
           ) : (
@@ -247,12 +247,12 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
 };
 
 export default function UploadPage() {
-  const [view, setView] = useState('upload'); 
+  const [view, setView] = useState('upload');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
-  const [server,setServers] = useState('prod');
+  const [server, setServers] = useState('prod');
 
   const [user, setUser] = useState<any>(null);
 
@@ -260,9 +260,9 @@ export default function UploadPage() {
     setServers(process.env.NEXT_PUBLIC_SERVER || 'prod');
     supabase.auth.getSession().then(({ data: { session } }: any) => {
       if (!session) {
-          router.push('/auth');
+        router.push('/auth');
       } else {
-          setUser(session.user);
+        setUser(session.user);
       }
     });
   }, [router]);
@@ -274,67 +274,66 @@ export default function UploadPage() {
 
   const handlePublish = async (meta: any) => {
     try {
-        if (!user) return; 
+      if (!user) return;
 
-        if (meta.isCustomSubject) {
-            const { data: existingSubs } = await supabase
-                .from('subjects')
-                .select('id')
-                .ilike('subject_name', meta.subject)
-                .maybeSingle();
-            
-            if (!existingSubs) {
-                const { error: subError } = await supabase.from('subjects').insert({
-                    academic_year: meta.year,
-                    subject_name: meta.subject
-                });
-                if (subError) throw subError;
-            }
-        }
+      if (meta.isCustomSubject) {
+        const { data: existingSubs } = await supabase
+          .from('subjects')
+          .select('id')
+          .ilike('subject_name', meta.subject)
+          .maybeSingle();
 
-        const { data: existingPaper, error: checkError } = await supabase
-            .from('papers')
-            .select('id')
-            .eq('academic_year', meta.year)
-            .ilike('subject', meta.subject) 
-            .eq('exam_type', meta.exam)
-            .eq('exam_year', meta.date)
-            .maybeSingle();
-
-        if (checkError) throw checkError;
-
-        if (existingPaper) {
-            alert(`Duplicate Error: A paper for ${meta.subject} (${meta.exam} ${meta.date}) already exists.`);
-            return;
-        }
-
-        const { data: paperData, error: paperError } = await supabase.from('papers').insert({
+        if (!existingSubs) {
+          const { error: subError } = await supabase.from('subjects').insert({
             academic_year: meta.year,
-            subject: meta.subject,
-            exam_type: meta.exam,
-            exam_year: meta.date,
-            user_id: user.id 
-        }).select().single();
+            subject_name: meta.subject
+          });
+          if (subError) throw subError;
+        }
+      }
 
-        if (paperError) throw paperError;
+      const { data: existingPaper, error: checkError } = await supabase
+        .from('papers')
+        .select('id')
+        .eq('academic_year', meta.year)
+        .ilike('subject', meta.subject)
+        .eq('exam_type', meta.exam)
+        .eq('exam_year', meta.date)
+        .maybeSingle();
 
-        const questionsToInsert = questions.map(q => ({
-            paper_id: paperData.id,
-            question_number: q.number,
-            content: q.content,
-            type: q.type,
-            image_path: q.image, 
-            difficulty_rating: q.difficulty || 1,
-            marks: q.marks || 0
-        }));
+      if (checkError) throw checkError;
 
-        const { error: qError } = await supabase.from('questions').insert(questionsToInsert);
-        if (qError) throw qError;
-        
-        router.push('/');
-    } catch (e) {
-        console.error("Publish Error", e);
-        alert("Failed to publish. Check console.");
+      if (existingPaper) {
+        alert(`Duplicate Error: A paper for ${meta.subject} (${meta.exam} ${meta.date}) already exists.`);
+        return;
+      }
+
+      const { data: paperData, error: paperError } = await supabase.from('papers').insert({
+        academic_year: meta.year,
+        subject: meta.subject,
+        exam_type: meta.exam,
+        exam_year: meta.date,
+        user_id: user.id
+      }).select().single();
+
+      if (paperError) throw paperError;
+
+      const questionsToInsert = questions.map(q => ({
+        paper_id: paperData.id,
+        question_number: q.number,
+        content: q.content,
+        type: q.type,
+        image_path: q.image,
+        difficulty_rating: q.difficulty || 1,
+        marks: q.marks || 0
+      }));
+
+      const { error: qError } = await supabase.from('questions').insert(questionsToInsert);
+      if (qError) throw qError;
+
+      router.push('/');
+    } catch (e: any) {
+      alert(`Failed to publish: ${e.message || 'Unknown error'}`);
     }
   };
 
@@ -342,72 +341,72 @@ export default function UploadPage() {
 
   if (view === 'processing') {
     if (uploadedFile && questions.length === 0) {
-       const extract = async () => {
-         try {
-            const formData = new FormData();
-            formData.append('file', uploadedFile);
-            const res = await fetch(server=='local' ? 'http://localhost:8000/extract' : 'https://sastrackerbackend.vercel.app/extract', { method: 'POST', body: formData });
-            if (!res.ok) throw new Error("Backend Error");
-            const data = await res.json();
-            const mapped = data.questions.map((q: any) => ({
-                ...q, verified: false, difficulty: 1, 
-                image: q.image_base64 || (q.hasImage ? "https://placehold.co/600x200?text=Image+Detected" : null)
-            }));
-            setQuestions(mapped);
-            setView('review');
-         } catch (e) {
-            alert("The AI Backend has been paused due to an outage or for maintenance. Expect it to work in an hour or two. Please do try uploading later. Meanwhile, explore all other questions");
-            setView('upload');
-         }
-       }
-       extract();
+      const extract = async () => {
+        try {
+          const formData = new FormData();
+          formData.append('file', uploadedFile);
+          const res = await fetch(server == 'local' ? 'http://localhost:8000/extract' : 'https://sastrackerbackend.vercel.app/extract', { method: 'POST', body: formData });
+          if (!res.ok) throw new Error("Backend Error");
+          const data = await res.json();
+          const mapped = data.questions.map((q: any) => ({
+            ...q, verified: false, difficulty: 1,
+            image: q.image_base64 || (q.hasImage ? "https://placehold.co/600x200?text=Image+Detected" : null)
+          }));
+          setQuestions(mapped);
+          setView('review');
+        } catch (e) {
+          alert("The AI Backend has been paused due to an outage or for maintenance. Expect it to work in an hour or two. Please do try uploading later. Meanwhile, explore all other questions");
+          setView('upload');
+        }
+      }
+      extract();
     }
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-[70vh]">
-            <Loader2 size={64} className="text-red-600 animate-spin mb-6" />
-            <h2 className="text-2xl font-black uppercase tracking-widest text-white">Extracting Data</h2>
-            <p className="text-zinc-500 font-mono text-sm mt-2">Connecting to AI Neural Net...</p>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[70vh]">
+        <Loader2 size={64} className="text-red-600 animate-spin mb-6" />
+        <h2 className="text-2xl font-black uppercase tracking-widest text-white">Extracting Data</h2>
+        <p className="text-zinc-500 font-mono text-sm mt-2">Connecting to AI Neural Net...</p>
+      </div>
     );
   }
 
   if (view === 'review') {
     return (
-        <div className="max-w-5xl mx-auto p-6">
-            <PublishModal 
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
-                onConfirm={handlePublish} 
-            />
-            
-            <div className="flex justify-between items-end mb-8 border-b border-zinc-800 pb-6 sticky top-0 bg-black z-10 pt-4">
-                <div>
-                    <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Review & Edit</h2>
-                    <p className="text-zinc-500 text-sm mt-1 font-mono">{uploadedFile?.name} • {questions.length} Items Extracted</p>
-                </div>
-                <div className="flex gap-4">
-                    <button onClick={() => setView('upload')} className="text-zinc-500 hover:text-white text-xs font-bold uppercase">Cancel</button>
-                    <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold px-6 py-2 uppercase tracking-wider text-xs hover:opacity-90 flex items-center gap-2"
-                    >
-                        <CheckCircle size={16} /> Finalize & Publish
-                    </button>
-                </div>
-            </div>
+      <div className="max-w-5xl mx-auto p-6">
+        <PublishModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onConfirm={handlePublish}
+        />
 
-            <div className="space-y-2">
-                {questions.map(q => (
-                    <QuestionEditor 
-                        key={q.id} 
-                        question={q} 
-                        onSave={(u: any) => setQuestions(questions.map(x => x.id === u.id ? u : x))} 
-                        onDelete={(id: string) => setQuestions(questions.filter(x => x.id !== id))} 
-                    />
-                ))}
-            </div>
+        <div className="flex justify-between items-end mb-8 border-b border-zinc-800 pb-6 sticky top-0 bg-black z-10 pt-4">
+          <div>
+            <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Review & Edit</h2>
+            <p className="text-zinc-500 text-sm mt-1 font-mono">{uploadedFile?.name} • {questions.length} Items Extracted</p>
+          </div>
+          <div className="flex gap-4">
+            <button onClick={() => setView('upload')} className="text-zinc-500 hover:text-white text-xs font-bold uppercase">Cancel</button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-gradient-to-r from-red-600 to-pink-600 text-white font-bold px-6 py-2 uppercase tracking-wider text-xs hover:opacity-90 flex items-center gap-2"
+            >
+              <CheckCircle size={16} /> Finalize & Publish
+            </button>
+          </div>
         </div>
+
+        <div className="space-y-2">
+          {questions.map(q => (
+            <QuestionEditor
+              key={q.id}
+              question={q}
+              onSave={(u: any) => setQuestions(questions.map(x => x.id === u.id ? u : x))}
+              onDelete={(id: string) => setQuestions(questions.filter(x => x.id !== id))}
+            />
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -419,24 +418,24 @@ export default function UploadPage() {
         </h1>
         <p className="text-zinc-400 text-lg max-w-2xl font-light">One universal repository for all PYQs SASTRA</p>
       </div>
-      <div 
+      <div
         className="w-full max-w-3xl h-64 border-2 border-dashed border-zinc-700 hover:border-zinc-500 bg-zinc-900/30 transition-all cursor-pointer flex flex-col items-center justify-center relative group"
         onClick={() => document.getElementById('file-upload')?.click()}
       >
-        <input 
-            id="file-upload" 
-            type="file" 
-            className="hidden" 
-            accept="application/pdf" 
-            onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} 
+        <input
+          id="file-upload"
+          type="file"
+          className="hidden"
+          accept="application/pdf"
+          onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
         />
         <Upload size={48} className="mb-6 text-zinc-500 group-hover:text-red-500 transition-colors" />
         <h3 className="text-xl font-bold text-white uppercase tracking-widest mb-2">Drop PDF Here</h3>
-      
-      <div className="mt-6 flex items-center gap-2 text-zinc-500 text-xs font-mono border border-zinc-800 px-3 py-1 rounded-full bg-zinc-900/50">
-         <AlertTriangle size={12} className="text-amber-500" />
-         <span>Max File Size: 4.5MB (Beta Limit)</span>
-      </div>
+
+        <div className="mt-6 flex items-center gap-2 text-zinc-500 text-xs font-mono border border-zinc-800 px-3 py-1 rounded-full bg-zinc-900/50">
+          <AlertTriangle size={12} className="text-amber-500" />
+          <span>Max File Size: 4.5MB (Beta Limit)</span>
+        </div>
       </div>
     </div>
   );

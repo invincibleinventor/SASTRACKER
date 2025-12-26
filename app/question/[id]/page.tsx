@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation'; 
-import { ArrowLeft, Star, User, Clock, Send, Paperclip, ChevronUp, ChevronDown, Loader2, X, Info, Sparkles, Bot, Trash2 } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft, Star, User, Clock, Send, Paperclip, ChevronUp, ChevronDown, Loader2, X, Info, Sparkles, Bot, Trash2, Flag } from 'lucide-react';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
+import ReportModal from '@/components/ReportModal';
 
 const supabase = createPagesBrowserClient();
 const LatexRenderer = ({ text }: { text: string }) => {
@@ -36,19 +37,19 @@ const LatexRenderer = ({ text }: { text: string }) => {
           const trimmed = part.trim();
 
           if (part.startsWith('$$') && part.endsWith('$$')) {
-             const div = document.createElement('div');
-             const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\');
-             (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false });
-             containerRef.current?.appendChild(div);
+            const div = document.createElement('div');
+            const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\');
+            (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false });
+            containerRef.current?.appendChild(div);
           } else if (part.startsWith('\\[') && part.endsWith('\\]')) {
-             const div = document.createElement('div');
-             const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\');
-             (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false });
-             containerRef.current?.appendChild(div);
+            const div = document.createElement('div');
+            const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\');
+            (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false });
+            containerRef.current?.appendChild(div);
           } else if (part.startsWith('\\begin')) {
-             const div = document.createElement('div');
-             (window as any).katex.render(part, div, { displayMode: true, throwOnError: false });
-             containerRef.current?.appendChild(div);
+            const div = document.createElement('div');
+            (window as any).katex.render(part, div, { displayMode: true, throwOnError: false });
+            containerRef.current?.appendChild(div);
           } else if (part.startsWith('$') && part.endsWith('$')) {
             const span = document.createElement('span');
             const cleanMath = part.slice(1, -1).replace(/\\\\/g, '\\');
@@ -89,14 +90,14 @@ export default function QuestionDetailPage() {
   const params = useParams();
   const id = params?.id as string;
   const router = useRouter();
-  
+
   const [user, setUser] = useState<any>(null);
   const [question, setQuestion] = useState<any>(null);
   const [answers, setAnswers] = useState<any[]>([]);
   const [aiAnswer, setAiAnswer] = useState<string | null>(null);
-  const [userVotes, setUserVotes] = useState<Record<string, number>>({}); 
+  const [userVotes, setUserVotes] = useState<Record<string, number>>({});
   const [userRating, setUserRating] = useState<number | null>(null);
-  
+
   const [newAnswer, setNewAnswer] = useState('');
   const [answerImage, setAnswerImage] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,6 +105,8 @@ export default function QuestionDetailPage() {
   const [uploading, setUploading] = useState(false);
   const answerFileRef = useRef<HTMLInputElement>(null);
   const [server, setServer] = useState('prod');
+  const [showreportquestion, setShowreportquestion] = useState(false);
+  const [reportinganswerid, setReportinganswerid] = useState<string | null>(null);
 
   useEffect(() => {
     setServer(process.env.NEXT_PUBLIC_SERVER || 'prod');
@@ -117,7 +120,7 @@ export default function QuestionDetailPage() {
 
     const fetchData = async () => {
       setLoading(true);
-      
+
       const { data: qData } = await supabase
         .from('questions')
         .select(`*, papers (academic_year, subject, exam_type, exam_year)`)
@@ -137,8 +140,8 @@ export default function QuestionDetailPage() {
         .select('content')
         .eq('question_id', id)
         .maybeSingle();
-      
-      if (aiData){ setAiAnswer(aiData.content);setAiAnswer(aiData.content);}
+
+      if (aiData) { setAiAnswer(aiData.content); setAiAnswer(aiData.content); }
 
       if (user) {
         const { data: vData } = await supabase.from('answer_votes').select('answer_id, vote_value').eq('user_id', user.id);
@@ -149,11 +152,11 @@ export default function QuestionDetailPage() {
         const { data: rData } = await supabase.from('question_ratings').select('rating').eq('user_id', user.id).eq('question_id', id).single();
         if (rData) setUserRating(rData.rating);
       }
-      
+
       setLoading(false);
     };
 
-    if (user !== undefined) fetchData(); 
+    if (user !== undefined) fetchData();
   }, [id, user]);
 
 
@@ -162,82 +165,80 @@ export default function QuestionDetailPage() {
     setGeneratingAI(true);
 
     try {
-        const res = await fetch(server === 'local' ? 'http://localhost:8000/solve' : 'https://sastrackerbackend.vercel.app/solve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                content: question.content,
-                image_url: question.image_path 
-            })
-        });
+      const res = await fetch(server === 'local' ? 'http://localhost:8000/solve' : 'https://sastrackerbackend.vercel.app/solve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: question.content,
+          image_url: question.image_path
+        })
+      });
 
-        if (!res.ok) throw new Error("AI Generation Failed");
-        const data = await res.json();
-        const solution = data.solution;
+      if (!res.ok) throw new Error("AI Generation Failed");
+      const data = await res.json();
+      const solution = data.solution;
 
-        const { error } = await supabase.from('ai_answers').insert({
-            question_id: id,
-            content: solution
-        });
+      const { error } = await supabase.from('ai_answers').insert({
+        question_id: id,
+        content: solution
+      });
 
-        if (error) throw error;
-        setAiAnswer(solution);
-        setAiAnswer(solution);
-        
+      if (error) throw error;
+      setAiAnswer(solution);
+
     } catch (e) {
-        alert("Failed to generate AI solution. Please try again later.");
-        console.error(e);
+      alert("Failed to generate AI solution. Please try again later.");
     } finally {
-        setGeneratingAI(false);
+      setGeneratingAI(false);
     }
   };
 
   const handlePostAnswer = async () => {
     if (!user) return router.push('/auth');
     if (!newAnswer.trim() && !answerImage) return;
-    
+
     setUploading(true);
     let imageUrl = null;
 
     try {
-        if (answerImage) {
-            const fileExt = answerImage.name.split('.').pop();
-            const fileName = `${Math.random()}.${fileExt}`;
-            const filePath = `${id}/${fileName}`;
-            await supabase.storage.from('answer-images').upload(filePath, answerImage);
-            const { data } = supabase.storage.from('answer-images').getPublicUrl(filePath);
-            imageUrl = data.publicUrl;
-        }
+      if (answerImage) {
+        const fileExt = answerImage.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${id}/${fileName}`;
+        await supabase.storage.from('answer-images').upload(filePath, answerImage);
+        const { data } = supabase.storage.from('answer-images').getPublicUrl(filePath);
+        imageUrl = data.publicUrl;
+      }
 
-        const { data, error } = await supabase.from('answers').insert({
-            question_id: id,
-            content: newAnswer,
-            author_name: user.email?.split('@')[0] || 'Anonymous', 
-            image_url: imageUrl,
-            net_votes: 0,
-            user_id: user.id
-        }).select();
+      const { data, error } = await supabase.from('answers').insert({
+        question_id: id,
+        content: newAnswer,
+        author_name: user.email?.split('@')[0] || 'Anonymous',
+        image_url: imageUrl,
+        net_votes: 0,
+        user_id: user.id
+      }).select();
 
-        if (error) throw error;
+      if (error) throw error;
 
-        setAnswers(prev => [data[0], ...prev]);
-        setNewAnswer("");
-        setAnswerImage(null);
+      setAnswers(prev => [data[0], ...prev]);
+      setNewAnswer("");
+      setAnswerImage(null);
     } catch (error: any) {
-        alert(`Failed to post: ${error.message}`);
+      alert(`Failed to post: ${error.message}`);
     } finally {
-        setUploading(false);
+      setUploading(false);
     }
   };
 
   const handleDeleteAnswer = async (answerId: string) => {
     if (!confirm("Delete your answer?")) return;
     try {
-        const { error } = await supabase.from('answers').delete().eq('id', answerId);
-        if (error) throw error;
-        setAnswers(answers.filter(a => a.id !== answerId));
+      const { error } = await supabase.from('answers').delete().eq('id', answerId);
+      if (error) throw error;
+      setAnswers(answers.filter(a => a.id !== answerId));
     } catch (e) {
-        alert("Failed to delete answer.");
+      alert("Failed to delete answer.");
     }
   };
 
@@ -252,7 +253,6 @@ export default function QuestionDetailPage() {
     }, { onConflict: 'user_id, question_id' });
 
     if (error) {
-      console.error("Rating failed", error);
       return;
     }
 
@@ -260,11 +260,11 @@ export default function QuestionDetailPage() {
     if (allRatings) {
       const total = allRatings.reduce((acc, curr) => acc + curr.rating, 0);
       const avg = total / allRatings.length;
-      await supabase.from('questions').update({ 
-        avg_rating: avg, 
-        rating_count: allRatings.length 
+      await supabase.from('questions').update({
+        avg_rating: avg,
+        rating_count: allRatings.length
       }).eq('id', id);
-      
+
       setQuestion((prev: any) => ({ ...prev, avg_rating: avg, rating_count: allRatings.length }));
     }
   };
@@ -272,13 +272,13 @@ export default function QuestionDetailPage() {
   const handleVote = async (answerId: string, type: 1 | -1) => {
     if (!user) return router.push('/auth');
 
-    const currentVote = userVotes[answerId]; 
+    const currentVote = userVotes[answerId];
     let newVoteValue: number | null = type;
     let voteDelta = 0;
-   
+
     if (currentVote === type) {
       newVoteValue = null;
-      voteDelta = -type; 
+      voteDelta = -type;
       await supabase.from('answer_votes').delete().match({ user_id: user.id, answer_id: answerId });
     } else if (currentVote) {
       voteDelta = type * 2;
@@ -296,7 +296,7 @@ export default function QuestionDetailPage() {
     setAnswers(prev => prev.map(a => {
       if (a.id === answerId) {
         const newNet = (a.net_votes || 0) + voteDelta;
-        supabase.from('answers').update({ net_votes: newNet }).eq('id', answerId).then(); 
+        supabase.from('answers').update({ net_votes: newNet }).eq('id', answerId);
         return { ...a, net_votes: newNet };
       }
       return a;
@@ -315,12 +315,28 @@ export default function QuestionDetailPage() {
           <ArrowLeft size={20} className="mr-2" /> Back to Bank
         </button>
 
+        <ReportModal
+          isopen={showreportquestion}
+          onclose={() => setShowreportquestion(false)}
+          contenttype="question"
+          contentid={id}
+        />
+
+        {reportinganswerid && (
+          <ReportModal
+            isopen={true}
+            onclose={() => setReportinganswerid(null)}
+            contenttype="comment"
+            contentid={reportinganswerid}
+          />
+        )}
+
         <div className="bg-zinc-900 border border-zinc-800 p-8 mb-8 relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-red-600 to-pink-600"></div>
           <div className="lg:absolute w-max  mb-8 lg:mb-0 top-4 right-4 text-xs font-mono border border-zinc-700 px-2 py-1 text-zinc-400">
             Q{question.question_number} • {question.marks || 0} Marks
           </div>
-          
+
           <div className="flex gap-2 mb-4 text-xs font-bold uppercase tracking-widest text-zinc-500 pr-24">
             <span>{question.papers?.academic_year}</span> •
             <span className="text-red-500">{question.papers?.subject}</span> •
@@ -330,94 +346,102 @@ export default function QuestionDetailPage() {
           <div className="text-xl md:text-2xl leading-relaxed font-light text-white mb-6 prose prose-invert max-w-none">
             <LatexRenderer text={question.content} />
             {question.image_path && (
-                <img src={question.image_path} alt="Question Diagram" className="mt-6 max-h-96 rounded border border-zinc-700 block" />
+              <img src={question.image_path} alt="Question Diagram" className="mt-6 max-h-96 rounded border border-zinc-700 block" />
             )}
           </div>
 
           <div className="border-t border-zinc-800 pt-4 flex flex-col md:flex-row md:items-center gap-4">
             <div className="flex items-center gap-1 text-xs uppercase font-bold text-zinc-600">
-                Rate Difficulty:
+              Rate Difficulty:
             </div>
             <div className="flex items-center gap-1">
               {[1, 2, 3, 4, 5].map((star) => (
-                <button 
-                    key={star} 
-                    onClick={() => handleRateQuestion(star)}
-                    className={`hover:scale-110 transition-transform ${userRating && star <= userRating ? "text-amber-500" : "text-zinc-700"}`}
+                <button
+                  key={star}
+                  onClick={() => handleRateQuestion(star)}
+                  className={`hover:scale-110 transition-transform ${userRating && star <= userRating ? "text-amber-500" : "text-zinc-700"}`}
                 >
                   <Star size={20} className={userRating && star <= userRating ? "fill-current" : ""} />
                 </button>
               ))}
             </div>
             <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-2">
-                <Info size={12}/> 
-                <span>1 Star = Easy, 5 Stars = Very Hard</span>
-                <span className="text-zinc-700">|</span>
-                <span>Avg: <span className="text-white">{question.avg_rating?.toFixed(1) || "N/A"}</span> ({question.rating_count || 0} votes)</span>
+              <Info size={12} />
+              <span>1 Star = Easy, 5 Stars = Very Hard</span>
+              <span className="text-zinc-700">|</span>
+              <span>Avg: <span className="text-white">{question.avg_rating?.toFixed(1) || "N/A"}</span> ({question.rating_count || 0} votes)</span>
             </div>
+            {user && (
+              <button
+                onClick={() => setShowreportquestion(true)}
+                className="ml-auto text-zinc-600 hover:text-red-400 flex items-center gap-1 text-xs"
+              >
+                <Flag size={12} /> Report
+              </button>
+            )}
           </div>
         </div>
 
         {/* AI Solution Section */}
         <div className="mb-10">
-            <div className="flex items-center gap-2 mb-4">
-                <Sparkles size={18} className="text-purple-500" />
-                <h3 className="text-lg font-black text-white uppercase tracking-tighter">AI Solution</h3>
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={18} className="text-purple-500" />
+            <h3 className="text-lg font-black text-white uppercase tracking-tighter">AI Solution</h3>
+          </div>
+
+          {aiAnswer ? (
+            <div className="bg-zinc-900/50 border border-purple-500/30 p-6 rounded-lg prose prose-invert max-w-none">
+              <div className="flex items-center gap-2 mb-4 text-purple-400 text-xs font-bold uppercase tracking-widest not-prose">
+                <Bot size={16} /> Generated by AI (Refresh Page If Text Is Malformed)
+              </div>
+              <LatexRenderer text={aiAnswer} />
             </div>
-            
-            {aiAnswer ? (
-                <div className="bg-zinc-900/50 border border-purple-500/30 p-6 rounded-lg prose prose-invert max-w-none">
-                    <div className="flex items-center gap-2 mb-4 text-purple-400 text-xs font-bold uppercase tracking-widest not-prose">
-                        <Bot size={16} /> Generated by AI (Refresh Page If Text Is Malformed)
-                    </div>
-                    <LatexRenderer text={aiAnswer} />
-                </div>
-            ) : (
-                <div className="bg-zinc-900/30 border border-zinc-800 border-dashed p-8 text-center">
-                    <p className="text-zinc-500 text-sm mb-4">No AI solution generated yet.</p>
-                    <button 
-                        onClick={handleGenerateAI}
-                        disabled={generatingAI}
-                        className="bg-white text-black font-bold px-6 py-3 text-xs uppercase hover:bg-purple-500 hover:text-white transition-colors inline-flex items-center gap-2 disabled:opacity-50"
-                    >
-                        {generatingAI ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16} />}
-                        {generatingAI ? "Solving..." : "Generate AI Solution"}
-                    </button>
-                </div>
-            )}
+          ) : (
+            <div className="bg-zinc-900/30 border border-zinc-800 border-dashed p-8 text-center">
+              <p className="text-zinc-500 text-sm mb-4">No AI solution generated yet.</p>
+              <button
+                onClick={handleGenerateAI}
+                disabled={generatingAI}
+                className="bg-white text-black font-bold px-6 py-3 text-xs uppercase hover:bg-purple-500 hover:text-white transition-colors inline-flex items-center gap-2 disabled:opacity-50"
+              >
+                {generatingAI ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                {generatingAI ? "Solving..." : "Generate AI Solution"}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Human Answers Section */}
         <div className="bg-black border border-zinc-800 p-6 mb-10 shadow-lg">
-            <h3 className="text-sm font-black uppercase tracking-widest text-zinc-500 mb-4">Contribute Solution</h3>
-            <textarea 
-              className="w-full bg-zinc-900/50 border border-zinc-700 p-4 text-sm text-white focus:border-red-600 outline-none transition-colors min-h-[120px]"
-              placeholder="Write your answer (Markdown/LaTeX supported)..."
-              value={newAnswer}
-              onChange={(e) => setNewAnswer(e.target.value)}
-            />
-            
-            {answerImage && (
-                <div className="mt-4 relative w-fit">
-                    <img src={URL.createObjectURL(answerImage)} className="h-24 rounded border border-zinc-700" />
-                    <button onClick={() => setAnswerImage(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1"><X size={12}/></button>
-                </div>
-            )}
+          <h3 className="text-sm font-black uppercase tracking-widest text-zinc-500 mb-4">Contribute Solution</h3>
+          <textarea
+            className="w-full bg-zinc-900/50 border border-zinc-700 p-4 text-sm text-white focus:border-red-600 outline-none transition-colors min-h-[120px]"
+            placeholder="Write your answer (Markdown/LaTeX supported)..."
+            value={newAnswer}
+            onChange={(e) => setNewAnswer(e.target.value)}
+          />
 
-            <div className="flex justify-between items-center mt-4">
-                <button onClick={() => answerFileRef.current?.click()} className="text-zinc-400 hover:text-white text-xs font-bold uppercase flex items-center gap-2">
-                    <Paperclip size={16} /> {answerImage ? "Replace Image" : "Attach Image"}
-                </button>
-                <input type="file" ref={answerFileRef} className="hidden" accept="image/*" onChange={(e) => e.target.files?.[0] && setAnswerImage(e.target.files[0])} />
-                
-                <button 
-                    onClick={handlePostAnswer}
-                    disabled={uploading}
-                    className="bg-zinc-100 text-black font-bold px-6 py-2 text-xs uppercase hover:bg-red-600 hover:text-white transition-colors flex items-center gap-2 disabled:opacity-50"
-                >
-                    {uploading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Post Answer
-                </button>
+          {answerImage && (
+            <div className="mt-4 relative w-fit">
+              <img src={URL.createObjectURL(answerImage)} className="h-24 rounded border border-zinc-700" />
+              <button onClick={() => setAnswerImage(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1"><X size={12} /></button>
             </div>
+          )}
+
+          <div className="flex justify-between items-center mt-4">
+            <button onClick={() => answerFileRef.current?.click()} className="text-zinc-400 hover:text-white text-xs font-bold uppercase flex items-center gap-2">
+              <Paperclip size={16} /> {answerImage ? "Replace Image" : "Attach Image"}
+            </button>
+            <input type="file" ref={answerFileRef} className="hidden" accept="image/*" onChange={(e) => e.target.files?.[0] && setAnswerImage(e.target.files[0])} />
+
+            <button
+              onClick={handlePostAnswer}
+              disabled={uploading}
+              className="bg-zinc-100 text-black font-bold px-6 py-2 text-xs uppercase hover:bg-red-600 hover:text-white transition-colors flex items-center gap-2 disabled:opacity-50"
+            >
+              {uploading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Post Answer
+            </button>
+          </div>
         </div>
 
         <div className="space-y-6 pb-6">
@@ -426,49 +450,53 @@ export default function QuestionDetailPage() {
           </h3>
 
           {answers.map(ans => {
-            const myVote = userVotes[ans.id] || 0; 
-            
+            const myVote = userVotes[ans.id] || 0;
+
             return (
-                <div key={ans.id} className="flex gap-4 border-l-2 border-zinc-800 pl-4 py-4 hover:border-red-900/50 transition-colors">
+              <div key={ans.id} className="flex gap-4 border-l-2 border-zinc-800 pl-4 py-4 hover:border-red-900/50 transition-colors">
                 <div className="flex flex-col items-center gap-1 min-w-[32px] pt-1">
-                    <button 
-                        onClick={() => handleVote(ans.id, 1)} 
-                        className={`p-1 transition-colors rounded ${myVote === 1 ? 'text-green-500 bg-green-900/20' : 'text-zinc-600 hover:text-green-500 hover:bg-zinc-900'}`}
-                    >
-                        <ChevronUp size={24} />
-                    </button>
-                    <span className={`text-sm font-bold font-mono ${ans.net_votes > 0 ? 'text-green-500' : ans.net_votes < 0 ? 'text-red-500' : 'text-zinc-500'}`}>
-                        {ans.net_votes || 0}
-                    </span>
-                    <button 
-                        onClick={() => handleVote(ans.id, -1)} 
-                        className={`p-1 transition-colors rounded ${myVote === -1 ? 'text-red-500 bg-red-900/20' : 'text-zinc-600 hover:text-red-500 hover:bg-zinc-900'}`}
-                    >
-                        <ChevronDown size={24} />
-                    </button>
+                  <button
+                    onClick={() => handleVote(ans.id, 1)}
+                    className={`p-1 transition-colors rounded ${myVote === 1 ? 'text-green-500 bg-green-900/20' : 'text-zinc-600 hover:text-green-500 hover:bg-zinc-900'}`}
+                  >
+                    <ChevronUp size={24} />
+                  </button>
+                  <span className={`text-sm font-bold font-mono ${ans.net_votes > 0 ? 'text-green-500' : ans.net_votes < 0 ? 'text-red-500' : 'text-zinc-500'}`}>
+                    {ans.net_votes || 0}
+                  </span>
+                  <button
+                    onClick={() => handleVote(ans.id, -1)}
+                    className={`p-1 transition-colors rounded ${myVote === -1 ? 'text-red-500 bg-red-900/20' : 'text-zinc-600 hover:text-red-500 hover:bg-zinc-900'}`}
+                  >
+                    <ChevronDown size={24} />
+                  </button>
                 </div>
 
                 <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-zinc-800 p-1 rounded-full"><User size={12} className="text-zinc-400"/></div>
-                            <span className="text-sm font-bold text-zinc-300">{ans.author_name}</span>
-                            <span className="text-xs text-zinc-600 flex items-center gap-1"><Clock size={10}/> {new Date(ans.created_at).toLocaleDateString()}</span>
-                        </div>
-                        {user?.id === ans.user_id && (
-                           <button onClick={() => handleDeleteAnswer(ans.id)} className="text-zinc-600 hover:text-red-500 transition-colors" title="Delete">
-                             <Trash2 size={14} />
-                           </button>
-                        )}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-zinc-800 p-1 rounded-full"><User size={12} className="text-zinc-400" /></div>
+                      <span className="text-sm font-bold text-zinc-300">{ans.author_name}</span>
+                      <span className="text-xs text-zinc-600 flex items-center gap-1"><Clock size={10} /> {new Date(ans.created_at).toLocaleDateString()}</span>
                     </div>
-                    <div className="text-zinc-400 text-sm leading-relaxed mb-3 prose prose-invert max-w-none">
-                        <LatexRenderer text={ans.content} />
-                    </div>
-                    {ans.image_url && (
-                        <img src={ans.image_url} alt="Answer Attachment" className="max-h-64 rounded border border-zinc-800" />
+                    {user?.id === ans.user_id ? (
+                      <button onClick={() => handleDeleteAnswer(ans.id)} className="text-zinc-600 hover:text-red-500 transition-colors" title="Delete">
+                        <Trash2 size={14} />
+                      </button>
+                    ) : user && (
+                      <button onClick={() => setReportinganswerid(ans.id)} className="text-zinc-600 hover:text-red-400 transition-colors" title="Report">
+                        <Flag size={14} />
+                      </button>
                     )}
+                  </div>
+                  <div className="text-zinc-400 text-sm leading-relaxed mb-3 prose prose-invert max-w-none">
+                    <LatexRenderer text={ans.content} />
+                  </div>
+                  {ans.image_url && (
+                    <img src={ans.image_url} alt="Answer Attachment" className="max-h-64 rounded border border-zinc-800" />
+                  )}
                 </div>
-                </div>
+              </div>
             );
           })}
         </div>

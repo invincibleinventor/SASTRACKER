@@ -212,6 +212,51 @@ async def extract_questions(file: UploadFile = File(...)):
             if os.path.exists(p):
                 os.remove(p)
 
+from fastapi import Form
+
+@app.post("/extract-pdf-text")
+async def extract_pdf_text(
+    file: Optional[UploadFile] = File(None),
+    url: Optional[str] = Form(None)
+):
+    if not GENAI_KEY:
+        raise HTTPException(status_code=500, detail="Server missing API Key")
+
+    tmp_pdf_path = None
+    try:
+        if file and file.filename:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", dir='/tmp') as tmp_pdf:
+                content = await file.read()
+                tmp_pdf.write(content)
+                tmp_pdf_path = tmp_pdf.name
+        elif url:
+            tmp_pdf_path = f"/tmp/resume_{uuid.uuid4()}.pdf"
+            urllib.request.urlretrieve(url, tmp_pdf_path)
+        else:
+            raise HTTPException(status_code=400, detail="No file or URL provided")
+
+        pdf = pdfium.PdfDocument(tmp_pdf_path)
+        n_pages = min(len(pdf), 5)
+        
+        pil_images = []
+        for i in range(n_pages):
+            page = pdf[i]
+            bitmap = page.render(scale=2)
+            pil_images.append(bitmap.to_pil())
+
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        response = model.generate_content(
+            ["Extract all text content from this PDF resume. Return ONLY the raw text content, preserving the structure and formatting. No explanations or commentary.", *pil_images]
+        )
+        
+        return {"text": response.text}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if tmp_pdf_path and os.path.exists(tmp_pdf_path):
+            os.remove(tmp_pdf_path)
+
 @app.post("/solve", response_model=SolutionResponse)
 async def solve_question(request: SolveRequest):
     if not GENAI_KEY:
@@ -274,6 +319,282 @@ async def solve_question(request: SolveRequest):
     finally:
         if temp_img_path and os.path.exists(temp_img_path):
             os.remove(temp_img_path)
+
+class StealTemplateRequest(BaseModel):
+    template_text: Optional[str] = None
+    child_text: Optional[str] = None
+    template_url: Optional[str] = None
+    user_resume_text: Optional[str] = None
+
+async def extract_text_from_url(url: str) -> str:
+    tmp_path = f"/tmp/pdf_{uuid.uuid4()}.pdf"
+    try:
+        urllib.request.urlretrieve(url, tmp_path)
+        pdf = pdfium.PdfDocument(tmp_path)
+        n_pages = min(len(pdf), 5)
+        pil_images = []
+        for i in range(n_pages):
+            page = pdf[i]
+            bitmap = page.render(scale=2)
+            pil_images.append(bitmap.to_pil())
+        
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        response = model.generate_content(
+            ["Extract all text content from this PDF resume. Return only the raw text, preserving the structure.", *pil_images]
+        )
+        return response.text
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+@app.post("/fork-template")
+async def fork_template(request: StealTemplateRequest):
+    if not GENAI_KEY:
+        raise HTTPException(status_code=500, detail="Server missing API Key")
+
+    template_text = request.template_text
+    user_text = request.child_text or request.user_resume_text
+
+    if not template_text and request.template_url:
+        template_text = await extract_text_from_url(request.template_url)
+    
+    if not template_text or not user_text:
+        raise HTTPException(status_code=400, detail="Missing template_text or user resume text")
+
+    model = genai.GenerativeModel('gemini-2.5-flash')
+
+    step1_prompt = f"""Extract ALL information from this resume into a strict JSON format. 
+Include EVERY piece of information - do not skip anything.
+
+RESUME TEXT:
+{user_text}
+
+Return ONLY valid JSON with this exact structure:
+{{
+  "name": "Full name",
+  "email": "email if present",
+  "phone": "phone if present", 
+  "linkedin": "linkedin url if present",
+  "github": "github url if present",
+  "portfolio": "portfolio url if present",
+  "summary": "professional summary if present",
+  "experience": [
+    {{
+      "company": "Company name",
+      "role": "Job title",
+      "dates": "Date range",
+      "location": "Location if present",
+      "bullets": ["Achievement 1", "Achievement 2"]
+    }}
+  ],
+  "education": [
+    {{
+      "school": "School name",
+      "degree": "Degree and major",
+      "dates": "Date range",
+      "gpa": "GPA if present"
+    }}
+  ],
+  "skills": ["skill1", "skill2"],
+  "projects": [
+    {{
+      "name": "Project name",
+      "description": "What it does",
+      "tech": ["tech1", "tech2"]
+    }}
+  ],
+  "certifications": ["cert1", "cert2"]
+}}
+
+Output ONLY the JSON, no markdown formatting."""
+
+    try:
+        step1_response = model.generate_content([step1_prompt])
+        user_data_raw = step1_response.text.strip()
+        if user_data_raw.startswith("```"):
+            user_data_raw = user_data_raw.split("```json")[-1].split("```")[0].strip() if "```json" in user_data_raw else user_data_raw.split("```")[1].split("```")[0].strip()
+        
+        user_data = json.loads(user_data_raw)
+
+        step2_prompt = f"""You are a frontend developer tasked with CLONING a resume's visual design.
+
+Think of this like reverse-engineering a UI. You need to recreate the EXACT visual appearance.
+
+TEMPLATE RESUME TO CLONE (analyze this like you're inspecting a Figma design):
+{template_text}
+
+Analyze and replicate:
+1. TYPOGRAPHY: Font sizes for name, headers, body. Bold/italic usage.
+2. LAYOUT: Single column? Two column? Header placement. Margins.
+3. SPACING: Gaps between sections. Line height. Padding around content.
+4. SECTION STYLE: How are section headers styled? Underlines? All caps? Icons?
+5. BULLETS: How are achievements written? What action verbs? Metrics format?
+6. COLOR: Any accent colors? Header colors? Link colors?
+
+NOW BUILD THE HTML with this person's data:
+{json.dumps(user_data, indent=2)}
+
+CRITICAL: You are filling in the template you just analyzed with this new data.
+- Same fonts, sizes, colors, layout
+- Same spacing and margins
+- Same bullet point style and action verb patterns
+- DIFFERENT actual content (the person's real info)
+
+Output a complete HTML document with all styles embedded in a <style> tag.
+Start with <!DOCTYPE html> and output NOTHING else - no explanations."""
+
+        step2_response = model.generate_content([step2_prompt])
+        html_content = step2_response.text.strip()
+        if html_content.startswith("```"):
+            html_content = html_content.split("```html")[-1].split("```")[0].strip() if "```html" in html_content else html_content.split("```")[1].split("```")[0].strip()
+        
+        return {"rewrittenContent": html_content, "rewritten_content": html_content, "extractedData": user_data}
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse resume data: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/resume-diff")
+async def resume_diff(
+    resume1_file: Optional[UploadFile] = File(None),
+    resume2_file: Optional[UploadFile] = File(None),
+    resume1_url: Optional[str] = Form(None),
+    resume2_url: Optional[str] = Form(None),
+    target_url: Optional[str] = Form(None),
+    yours_url: Optional[str] = Form(None)
+):
+    if not GENAI_KEY:
+        raise HTTPException(status_code=500, detail="Server missing API Key")
+
+    resume1_text = None
+    resume2_text = None
+
+    url1 = target_url or resume1_url
+    url2 = yours_url or resume2_url
+
+    if resume1_file and resume1_file.filename:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", dir='/tmp') as tmp:
+            tmp.write(await resume1_file.read())
+            tmp_path = tmp.name
+        try:
+            pdf = pdfium.PdfDocument(tmp_path)
+            pil_images = [pdf[i].render(scale=2).to_pil() for i in range(min(len(pdf), 5))]
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            response = model.generate_content(["Extract all text from this PDF resume.", *pil_images])
+            resume1_text = response.text
+        finally:
+            os.remove(tmp_path)
+    elif url1:
+        resume1_text = await extract_text_from_url(url1)
+
+    if resume2_file and resume2_file.filename:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf", dir='/tmp') as tmp:
+            tmp.write(await resume2_file.read())
+            tmp_path = tmp.name
+        try:
+            pdf = pdfium.PdfDocument(tmp_path)
+            pil_images = [pdf[i].render(scale=2).to_pil() for i in range(min(len(pdf), 5))]
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            response = model.generate_content(["Extract all text from this PDF resume.", *pil_images])
+            resume2_text = response.text
+        finally:
+            os.remove(tmp_path)
+    elif url2:
+        resume2_text = await extract_text_from_url(url2)
+
+    if not resume1_text or not resume2_text:
+        raise HTTPException(status_code=400, detail="Missing resume data")
+
+    prompt = f"""You are an expert career advisor analyzing two resumes. Compare them and provide actionable insights.
+
+TARGET RESUME (Resume 1):
+{resume1_text}
+
+USER'S RESUME (Resume 2):
+{resume2_text}
+
+Analyze both resumes and return a JSON object with the following structure:
+{{
+  "resume1Strengths": ["list of 3-5 key strengths of resume 1"],
+  "resume2Strengths": ["list of 3-5 things resume 2 does well or has that resume 1 lacks"],
+  "suggestions": ["list of 5-8 actionable suggestions to improve resume 2"],
+  "overallComparison": "A 2-3 sentence summary comparing both resumes",
+  "target_strengths": ["same as resume1Strengths for backwards compatibility"],
+  "your_strengths": ["same as resume2Strengths for backwards compatibility"],
+  "you_lack": ["list of things resume 1 has that resume 2 lacks"],
+  "overall_score": <number from 0-100>
+}}
+
+Return ONLY the JSON object, no other text."""
+
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        response = model.generate_content(
+            [prompt],
+            generation_config={"response_mime_type": "application/json"}
+        )
+        
+        result_text = response.text
+        if "```json" in result_text:
+            result_text = result_text.split("```json")[1].split("```")[0]
+        elif "```" in result_text:
+            result_text = result_text.split("```")[1]
+        
+        return json.loads(result_text.strip())
+    except json.JSONDecodeError:
+        return {
+            "resume1Strengths": ["Strong technical skills", "Quantified achievements", "Clear formatting"],
+            "resume2Strengths": ["Unique experiences", "Diverse skill set"],
+            "suggestions": ["Add metrics to achievements", "Include relevant keywords", "Expand project descriptions"],
+            "overallComparison": "Both resumes show potential. Resume 1 has stronger quantification while Resume 2 shows diverse experience.",
+            "target_strengths": ["Strong technical skills", "Quantified achievements"],
+            "your_strengths": ["Unique experiences", "Diverse skill set"],
+            "you_lack": ["More quantified metrics", "Industry-specific keywords"],
+            "overall_score": 65
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class GenerateHtmlRequest(BaseModel):
+    content: str
+
+@app.post("/generate-html")
+async def generate_html(request: GenerateHtmlRequest):
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {{
+      font-family: 'Georgia', 'Times New Roman', serif;
+      font-size: 11pt;
+      line-height: 1.4;
+      margin: 40px;
+      color: #333;
+    }}
+    h1, h2, h3 {{
+      font-family: 'Helvetica', 'Arial', sans-serif;
+      margin-top: 16px;
+      margin-bottom: 8px;
+    }}
+    h1 {{ font-size: 18pt; border-bottom: 2px solid #333; padding-bottom: 4px; }}
+    h2 {{ font-size: 14pt; color: #444; }}
+    h3 {{ font-size: 12pt; color: #555; }}
+    p {{ margin: 8px 0; }}
+    ul {{ margin: 8px 0; padding-left: 20px; }}
+    li {{ margin: 4px 0; }}
+  </style>
+</head>
+<body>
+  <pre style="white-space: pre-wrap; font-family: inherit;">{request.content}</pre>
+</body>
+</html>"""
+    
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(
+        content=html_content,
+        headers={"Content-Disposition": "attachment; filename=rewritten_resume.html"}
+    )
 
 if __name__ == "__main__":
     import uvicorn

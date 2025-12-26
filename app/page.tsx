@@ -4,11 +4,16 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
 import { Filter, Search, Star, ArrowRight, Loader2, Image as ImageIcon, Bot, FileText, Calendar, GraduationCap, ArrowLeft, Layers } from 'lucide-react';
-
+import PyQLanding from './components/pyq-landing';
 
 const supabase = createPagesBrowserClient();
+const SASTRA_DOMAINS = ["sastra.ac.in", "sastra.edu"];
+
+function isSastraEmail(email: string): boolean {
+  return SASTRA_DOMAINS.some((d) => email.toLowerCase().trim().endsWith(d));
+}
 let feedCache = {
-  queryKey: '', 
+  queryKey: '',
   data: [] as any[],
   page: 0,
   hasMore: true,
@@ -45,19 +50,19 @@ const LatexRenderer = ({ text }: { text: string }) => {
           const trimmed = part.trim();
 
           if (part.startsWith('$$') && part.endsWith('$$')) {
-             const div = document.createElement('div');
-             const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\');
-             (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false });
-             containerRef.current?.appendChild(div);
+            const div = document.createElement('div');
+            const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\');
+            (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false });
+            containerRef.current?.appendChild(div);
           } else if (part.startsWith('\\[') && part.endsWith('\\]')) {
-             const div = document.createElement('div');
-             const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\');
-             (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false });
-             containerRef.current?.appendChild(div);
+            const div = document.createElement('div');
+            const cleanMath = part.slice(2, -2).replace(/\\\\/g, '\\');
+            (window as any).katex.render(cleanMath, div, { displayMode: true, throwOnError: false });
+            containerRef.current?.appendChild(div);
           } else if (part.startsWith('\\begin')) {
-             const div = document.createElement('div');
-             (window as any).katex.render(part, div, { displayMode: true, throwOnError: false });
-             containerRef.current?.appendChild(div);
+            const div = document.createElement('div');
+            (window as any).katex.render(part, div, { displayMode: true, throwOnError: false });
+            containerRef.current?.appendChild(div);
           } else if (part.startsWith('$') && part.endsWith('$')) {
             const span = document.createElement('span');
             const cleanMath = part.slice(1, -1).replace(/\\\\/g, '\\');
@@ -98,11 +103,15 @@ const LatexRenderer = ({ text }: { text: string }) => {
 export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
-  const [filters, setFilters] = useState({ 
-    year: searchParams.get('year') || '', 
-    subject: searchParams.get('subject') || '', 
-    exam: searchParams.get('exam') || '', 
+
+  const [authChecked, setAuthChecked] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isSastra, setIsSastra] = useState(false);
+
+  const [filters, setFilters] = useState({
+    year: searchParams.get('year') || '',
+    subject: searchParams.get('subject') || '',
+    exam: searchParams.get('exam') || '',
     date: searchParams.get('date') || '',
     marks: searchParams.get('marks') || ''
   });
@@ -123,167 +132,186 @@ export default function Home() {
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const email = session.user.email || '';
+        const sastra = isSastraEmail(email);
+        setUser(session.user);
+        setIsSastra(sastra);
+        if (!sastra) {
+          router.push('/resumes');
+          return;
+        }
+      }
+      setAuthChecked(true);
+    };
+    checkAuth();
+  }, [router]);
+
+  useEffect(() => {
     if (filters.year) {
-        supabase.from('subjects').select('subject_name').eq('academic_year', filters.year)
-            .then(({ data }) => setFilterSubjects(data ? data.map(s => s.subject_name) : []));
+      supabase.from('subjects').select('subject_name').eq('academic_year', filters.year)
+        .then(({ data }) => setFilterSubjects(data ? data.map(s => s.subject_name) : []));
     }
   }, [filters.year]);
 
   useEffect(() => {
+    if (!authChecked || !user) return;
     const fetchPapers = async () => {
       const { data, error } = await supabase
         .from('papers')
         .select('*')
         .order('subject', { ascending: false })
         .limit(50);
-      
+
       if (!error && data) {
         setPapers(data);
       }
     };
     fetchPapers();
-  }, []);
+  }, [authChecked, user]);
 
-   const fetchQuestions = useCallback(async (currentFilters: any, currentQuery: string, currentGroup: string, isNewSearch = false) => {
-  const queryKey = JSON.stringify({ ...currentFilters, q: currentQuery, g: currentGroup });
+  const fetchQuestions = useCallback(async (currentFilters: any, currentQuery: string, currentGroup: string, isNewSearch = false) => {
+    const queryKey = JSON.stringify({ ...currentFilters, q: currentQuery, g: currentGroup });
 
-  if (isNewSearch && feedCache.queryKey === queryKey && feedCache.data.length > 0) {
-    setDisplayQuestions(feedCache.data);
-    setPage(feedCache.page);
-    setHasMore(feedCache.hasMore);
-    setHasSearched(true);
-    return;
-  }
+    if (isNewSearch && feedCache.queryKey === queryKey && feedCache.data.length > 0) {
+      setDisplayQuestions(feedCache.data);
+      setPage(feedCache.page);
+      setHasMore(feedCache.hasMore);
+      setHasSearched(true);
+      return;
+    }
 
-  if (!currentQuery && !currentFilters.year && !currentFilters.subject && !currentFilters.exam && !currentFilters.date && !currentFilters.marks && !currentGroup) {
-    setHasSearched(false);
-    return;
-  }
+    if (!currentQuery && !currentFilters.year && !currentFilters.subject && !currentFilters.exam && !currentFilters.date && !currentFilters.marks && !currentGroup) {
+      setHasSearched(false);
+      return;
+    }
 
-  // prevent concurrent fetches reliably
-  if (isLoadingRef.current) return;
-  isLoadingRef.current = true;
-  setIsLoading(true);
+    // prevent concurrent fetches reliably
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
+    setIsLoading(true);
 
-  // determine page to request — optimistic reservation to avoid duplicate requests
-  const authoritativePage = feedCache.page ?? 0; // pages already loaded count
-  const requestingPage = isNewSearch ? 0 : authoritativePage; // request this page
-  // reserve next page immediately so another click won't request same page
-  if (!isNewSearch) feedCache.page = requestingPage + 1;
+    // determine page to request — optimistic reservation to avoid duplicate requests
+    const authoritativePage = feedCache.page ?? 0; // pages already loaded count
+    const requestingPage = isNewSearch ? 0 : authoritativePage; // request this page
+    // reserve next page immediately so another click won't request same page
+    if (!isNewSearch) feedCache.page = requestingPage + 1;
 
-  const from = requestingPage * ITEMS_PER_PAGE;
-  const to = from + ITEMS_PER_PAGE - 1;
+    const from = requestingPage * ITEMS_PER_PAGE;
+    const to = from + ITEMS_PER_PAGE - 1;
 
-  let data: any[] | null = [];
-  let error: any = null;
+    let data: any[] | null = [];
+    let error: any = null;
 
-  if (currentQuery) {
-    const { data: rpcData, error: rpcError } = await supabase.rpc('search_questions', { keyword: currentQuery });
-    error = rpcError;
-    if (rpcData) {
-      data = rpcData.slice(from, to + 1);
-      const moreAvailable = rpcData.length > to;
+    if (currentQuery) {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('search_questions', { keyword: currentQuery });
+      error = rpcError;
+      if (rpcData) {
+        data = rpcData.slice(from, to + 1);
+        const moreAvailable = rpcData.length > to;
+        setHasMore(moreAvailable);
+        feedCache.hasMore = moreAvailable;
+      }
+    } else {
+      let query = supabase.from('questions')
+        .select(`*, ai_answers(id), papers!inner (academic_year, subject, exam_type, exam_year)`)
+        .range(from, to);
+
+      if (currentFilters.year) query = query.eq('papers.academic_year', currentFilters.year);
+      if (currentFilters.subject) query = query.ilike('papers.subject', `%${currentFilters.subject}%`);
+      if (currentFilters.exam && currentGroup !== 'exam') query = query.eq('papers.exam_type', currentFilters.exam);
+      if (currentFilters.date && currentGroup !== 'date') query = query.eq('papers.exam_year', currentFilters.date);
+      if (currentFilters.marks) query = query.eq('marks', currentFilters.marks);
+
+      if (currentGroup === 'year') query = query.order('academic_year', { referencedTable: 'papers', ascending: true });
+      if (currentGroup === 'subject') query = query.order('subject', { referencedTable: 'papers', ascending: true });
+      if (currentGroup === 'exam') query = query.order('exam_type', { referencedTable: 'papers', ascending: true });
+      if (currentGroup === 'date') query = query.order('exam_year', { referencedTable: 'papers', ascending: false });
+
+      const res = await query;
+      error = res.error;
+      data = res.data ?? [];
+
+      const moreAvailable = data.length === ITEMS_PER_PAGE;
       setHasMore(moreAvailable);
       feedCache.hasMore = moreAvailable;
     }
-  } else {
-    let query = supabase.from('questions')
-      .select(`*, ai_answers(id), papers!inner (academic_year, subject, exam_type, exam_year)`)
-      .range(from, to);
 
-    if (currentFilters.year) query = query.eq('papers.academic_year', currentFilters.year);
-    if (currentFilters.subject) query = query.ilike('papers.subject', `%${currentFilters.subject}%`);
-    if (currentFilters.exam && currentGroup !== 'exam') query = query.eq('papers.exam_type', currentFilters.exam);
-    if (currentFilters.date && currentGroup !== 'date') query = query.eq('papers.exam_year', currentFilters.date);
-    if (currentFilters.marks) query = query.eq('marks', currentFilters.marks);
+    if (!error && data) {
+      const formatted = data.map((q: any) => ({
+        ...q,
+        academic_year: q.academic_year || q.papers?.academic_year,
+        subject: q.subject || q.papers?.subject,
+        exam_type: q.exam_type || q.papers?.exam_type,
+        exam_year: q.exam_year || q.papers?.exam_year,
+        avg_rating: q.avg_rating || 0,
+        isAiAnswered: q.has_ai_solution === true || (q.ai_answers && q.ai_answers.length > 0)
+      }));
 
-    if (currentGroup === 'year') query = query.order('academic_year', { referencedTable: 'papers', ascending: true });
-    if (currentGroup === 'subject') query = query.order('subject', { referencedTable: 'papers', ascending: true });
-    if (currentGroup === 'exam') query = query.order('exam_type', { referencedTable: 'papers', ascending: true });
-    if (currentGroup === 'date') query = query.order('exam_year', { referencedTable: 'papers', ascending: false });
+      // sort each fetched page internally when grouping active so page is deterministic
+      if (!currentQuery && currentGroup) {
+        formatted.sort((a: any, b: any) => {
+          const aKey = getGroupLabel(a, currentGroup) ?? '';
+          const bKey = getGroupLabel(b, currentGroup) ?? '';
+          const cmp = String(aKey).localeCompare(String(bKey), undefined, { numeric: true, sensitivity: 'base' });
+          if (cmp !== 0) return cmp;
+          if (typeof a.id === 'number' && typeof b.id === 'number') return a.id - b.id;
+          return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+        });
+      }
 
-    const res = await query;
-    error = res.error;
-    data = res.data ?? [];
-
-    const moreAvailable = data.length === ITEMS_PER_PAGE;
-    setHasMore(moreAvailable);
-    feedCache.hasMore = moreAvailable;
-  }
-
-  if (!error && data) {
-    const formatted = data.map((q: any) => ({
-      ...q,
-      academic_year: q.academic_year || q.papers?.academic_year,
-      subject: q.subject || q.papers?.subject,
-      exam_type: q.exam_type || q.papers?.exam_type,
-      exam_year: q.exam_year || q.papers?.exam_year,
-      avg_rating: q.avg_rating || 0,
-      isAiAnswered: q.has_ai_solution === true || (q.ai_answers && q.ai_answers.length > 0)
-    }));
-
-    // sort each fetched page internally when grouping active so page is deterministic
-    if (!currentQuery && currentGroup) {
-      formatted.sort((a: any, b: any) => {
-        const aKey = getGroupLabel(a, currentGroup) ?? '';
-        const bKey = getGroupLabel(b, currentGroup) ?? '';
-        const cmp = String(aKey).localeCompare(String(bKey), undefined, { numeric: true, sensitivity: 'base' });
-        if (cmp !== 0) return cmp;
-        if (typeof a.id === 'number' && typeof b.id === 'number') return a.id - b.id;
-        return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
-      });
+      if (isNewSearch) {
+        // first page — replace cache and state
+        feedCache = {
+          queryKey,
+          data: formatted,
+          page: 1,
+          hasMore: (data.length === ITEMS_PER_PAGE),
+          scrollPos: 0
+        };
+        setDisplayQuestions(formatted);
+        setPage(1);
+        setHasSearched(true);
+      } else {
+        // append new page after existing items — use functional state update to avoid stale closures
+        feedCache.data = [...(feedCache.data || []), ...formatted];
+        setDisplayQuestions(prev => {
+          // ensure we append to what's currently rendered (React will reconcile order correctly)
+          return [...prev, ...formatted];
+        });
+        // page already reserved above; reflect in react state
+        setPage(prev => prev + 1);
+      }
+    } else if (error) {
+      // on error, if we optimistically reserved a page, roll it back so user can retry
+      if (!isNewSearch) feedCache.page = Math.max(0, (feedCache.page ?? 1) - 1);
     }
 
-    if (isNewSearch) {
-      // first page — replace cache and state
-      feedCache = {
-        queryKey,
-        data: formatted,
-        page: 1,
-        hasMore: (data.length === ITEMS_PER_PAGE),
-        scrollPos: 0
-      };
-      setDisplayQuestions(formatted);
-      setPage(1);
-      setHasSearched(true);
-    } else {
-      // append new page after existing items — use functional state update to avoid stale closures
-      feedCache.data = [...(feedCache.data || []), ...formatted];
-      setDisplayQuestions(prev => {
-        // ensure we append to what's currently rendered (React will reconcile order correctly)
-        return [...prev, ...formatted];
-      });
-      // page already reserved above; reflect in react state
-      setPage(prev => prev + 1);
-    }
-  } else if (error) {
-    // on error, if we optimistically reserved a page, roll it back so user can retry
-    if (!isNewSearch) feedCache.page = Math.max(0, (feedCache.page ?? 1) - 1);
-  }
-
-  isLoadingRef.current = false;
-  setIsLoading(false);
-}, []); // deps intentionally empty; feedCache and refs are authoritative
+    isLoadingRef.current = false;
+    setIsLoading(false);
+  }, []); // deps intentionally empty; feedCache and refs are authoritative
 
 
   useEffect(() => {
     const urlFilters = {
-        year: searchParams.get('year') || '',
-        subject: searchParams.get('subject') || '',
-        exam: searchParams.get('exam') || '',
-        date: searchParams.get('date') || '',
-        marks: searchParams.get('marks') || ''
+      year: searchParams.get('year') || '',
+      subject: searchParams.get('subject') || '',
+      exam: searchParams.get('exam') || '',
+      date: searchParams.get('date') || '',
+      marks: searchParams.get('marks') || ''
     };
     const q = searchParams.get('q') || '';
     const g = searchParams.get('group') || '';
-    
+
     setFilters(urlFilters);
     setSearchQuery(q);
     setGroupByInput(g);
     if (q || urlFilters.year || urlFilters.subject || urlFilters.exam || urlFilters.date || urlFilters.marks || g) {
-        fetchQuestions(urlFilters, q, g, true);
+      fetchQuestions(urlFilters, q, g, true);
     } else {
-        setHasSearched(false);
+      setHasSearched(false);
     }
   }, [searchParams]);
 
@@ -291,13 +319,13 @@ export default function Home() {
     const params = new URLSearchParams();
     if (queryStr) params.set('q', queryStr);
     if (groupStr) params.set('group', groupStr);
-    
+
     if (!queryStr) {
-        if (newFilters.year) params.set('year', newFilters.year);
-        if (newFilters.subject) params.set('subject', newFilters.subject);
-        if (newFilters.exam && groupStr !== 'exam') params.set('exam', newFilters.exam);
-        if (newFilters.date && groupStr !== 'date') params.set('date', newFilters.date);
-        if (newFilters.marks) params.set('marks', newFilters.marks);
+      if (newFilters.year) params.set('year', newFilters.year);
+      if (newFilters.subject) params.set('subject', newFilters.subject);
+      if (newFilters.exam && groupStr !== 'exam') params.set('exam', newFilters.exam);
+      if (newFilters.date && groupStr !== 'date') params.set('date', newFilters.date);
+      if (newFilters.marks) params.set('marks', newFilters.marks);
     }
     router.push(`/?${params.toString()}`);
   };
@@ -308,27 +336,27 @@ export default function Home() {
 
   const handleTagClick = (e: React.MouseEvent, key: string, val: string) => {
     e.stopPropagation();
-    const newFilters = { 
-        year: '', 
-        subject: '', 
-        exam: '', 
-        date: '',
-        marks: '',
-        [key]: val 
+    const newFilters = {
+      year: '',
+      subject: '',
+      exam: '',
+      date: '',
+      marks: '',
+      [key]: val
     };
     setFilters(newFilters);
-    setSearchQuery(''); 
+    setSearchQuery('');
     setGroupByInput('');
     updateUrl(newFilters, '', '');
   };
 
   const handlePaperClick = (paper: any) => {
     const newFilters = {
-        year: paper.academic_year,
-        subject: paper.subject,
-        exam: paper.exam_type,
-        date: paper.exam_year,
-        marks: ''
+      year: paper.academic_year,
+      subject: paper.subject,
+      exam: paper.exam_type,
+      date: paper.exam_year,
+      marks: ''
     };
     setFilters(newFilters);
     setGroupByInput('');
@@ -349,13 +377,13 @@ export default function Home() {
   };
 
   const getGroupLabel = (q: any, type: string) => {
-      switch(type) {
-          case 'year': return q.academic_year;
-          case 'subject': return q.subject;
-          case 'exam': return q.exam_type;
-          case 'date': return q.exam_year;
-          default: return '';
-      }
+    switch (type) {
+      case 'year': return q.academic_year;
+      case 'subject': return q.subject;
+      case 'exam': return q.exam_type;
+      case 'date': return q.exam_year;
+      default: return '';
+    }
   };
 
   const styles = {
@@ -365,39 +393,51 @@ export default function Home() {
     groupHeader: "text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-500 uppercase tracking-tighter py-6 border-b border-zinc-800 mb-4 mt-8 first:mt-0"
   };
 
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
+        <Loader2 className="text-red-600 animate-spin" size={32} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <PyQLanding />;
+  }
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="bg-black border border-zinc-800 p-6 mb-8 lg:sticky top-20 z-40 shadow-2xl shadow-black">
         <div className="mb-6 relative">
-            <input 
-                type="text" 
-                className="w-full lg:text-base text-sm bg-zinc-900 border border-zinc-700 p-4 pl-12 text-white placeholder-zinc-500 focus:border-red-600 outline-none transition-colors"
-                placeholder="Search across all questions (e.g., 'Resultant', 'Routhe Array')..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearchClick()}
-            />
-            <Search className="absolute left-4 top-4 text-zinc-500" size={20} />
+          <input
+            type="text"
+            className="w-full lg:text-base text-sm bg-zinc-900 border border-zinc-700 p-4 pl-12 text-white placeholder-zinc-500 focus:border-red-600 outline-none transition-colors"
+            placeholder="Search across all questions (e.g., 'Resultant', 'Routhe Array')..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearchClick()}
+          />
+          <Search className="absolute left-4 top-4 text-zinc-500" size={20} />
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4 items-end">
           <div className="col-span-2 md:col-span-1 lg:col-span-1">
-                <div className="flex items-center gap-2 text-zinc-500 text-[10px] uppercase font-bold mb-2">
-                    <Layers size={12} /> Group By
-                </div>
-                <select className={styles.input + " border-l-4 border-l-red-600"} value={groupByInput} onChange={e => setGroupByInput(e.target.value)}>
-                    <option value="">None</option>
-                    <option value="year">Year</option>
-                    <option value="subject">Subject</option>
-                    <option value="exam">Exam Type</option>
-                    <option value="date">Exam Year</option>
-                </select>
+            <div className="flex items-center gap-2 text-zinc-500 text-[10px] uppercase font-bold mb-2">
+              <Layers size={12} /> Group By
+            </div>
+            <select className={styles.input + " border-l-4 border-l-red-600"} value={groupByInput} onChange={e => setGroupByInput(e.target.value)}>
+              <option value="">None</option>
+              <option value="year">Year</option>
+              <option value="subject">Subject</option>
+              <option value="exam">Exam Type</option>
+              <option value="date">Exam Year</option>
+            </select>
           </div>
 
-          <select 
-            className={styles.input} 
-            value={filters.year} 
-            onChange={e => setFilters({...filters, year: e.target.value, subject: ''})}
+          <select
+            className={styles.input}
+            value={filters.year}
+            onChange={e => setFilters({ ...filters, year: e.target.value, subject: '' })}
             disabled={groupByInput === 'year'}
           >
             <option value="">Year...</option>
@@ -407,215 +447,215 @@ export default function Home() {
             <option value="Fourth Year">Fourth Year</option>
           </select>
 
-          <select 
-            className={styles.input} 
-            value={filters.subject} 
-            onChange={e => setFilters({...filters, subject: e.target.value})} 
+          <select
+            className={styles.input}
+            value={filters.subject}
+            onChange={e => setFilters({ ...filters, subject: e.target.value })}
             disabled={!filters.year || groupByInput === 'subject'}
           >
             <option value="">Subject...</option>
             {filterSubjects.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
 
-          <select 
-            className={styles.input} 
-            value={filters.exam} 
-            onChange={e => setFilters({...filters, exam: e.target.value})}
+          <select
+            className={styles.input}
+            value={filters.exam}
+            onChange={e => setFilters({ ...filters, exam: e.target.value })}
             disabled={groupByInput === 'exam'}
           >
             <option value="">Exam...</option>
             {['CIA - 1', 'CIA - 2', 'CIA - 3', 'End Sem', 'Lab Cia', 'End Sem Lab'].map(t => <option key={t} value={t}>{t}</option>)}
           </select>
 
-          <input 
-            type="number" 
-            className={styles.input} 
-            placeholder="Year" 
-            value={filters.date} 
-            onChange={e => setFilters({...filters, date: e.target.value})} 
+          <input
+            type="number"
+            className={styles.input}
+            placeholder="Year"
+            value={filters.date}
+            onChange={e => setFilters({ ...filters, date: e.target.value })}
             disabled={groupByInput === 'date'}
           />
 
-          <select className={styles.input} value={filters.marks} onChange={e => setFilters({...filters, marks: e.target.value})}>
+          <select className={styles.input} value={filters.marks} onChange={e => setFilters({ ...filters, marks: e.target.value })}>
             <option value="">Marks...</option>
-            {[1,2,3,4,5,7,8,10,15,20,25].map(m => <option key={m} value={m}>{m} Marks</option>)}
+            {[1, 2, 3, 4, 5, 7, 8, 10, 15, 20, 25].map(m => <option key={m} value={m}>{m} Marks</option>)}
           </select>
 
-          <button onClick={handleSearchClick} className={styles.btnPrimary+' h-[46px] w-full'}><Search size={14}/> Find</button>
+          <button onClick={handleSearchClick} className={styles.btnPrimary + ' h-[46px] w-full'}><Search size={14} /> Find</button>
         </div>
       </div>
 
       <div className="space-y-4 min-h-[50vh]">
-                {!hasSearched && !isLoading && (
+        {!hasSearched && !isLoading && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in duration-500">
-             {papers.length > 0 ? (
-                 papers.map(paper => (
-                     <div 
-                        key={paper.id} 
-                        onClick={() => handlePaperClick(paper)}
-                        className="bg-black border border-zinc-800 p-6 hover:border-red-900/50 hover:bg-zinc-900/10 cursor-pointer transition-all group relative"
-                     >
-                         <div className="absolute top-4 right-4 opacity-50 group-hover:opacity-100 transition-opacity">
-                             <ArrowRight size={20} className="text-zinc-600 group-hover:text-red-500" />
-                         </div>
-                         
-                         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-600 mb-3">
-                             <GraduationCap size={14} />
-                             {paper.academic_year}
-                         </div>
-                         
-                         <h3 className="text-lg font-black text-white mb-2 line-clamp-2 h-14">
-                             {paper.subject}
-                         </h3>
-                         
-                         <div className="flex items-center gap-4 text-zinc-500 text-sm font-mono mt-4 border-t border-zinc-900 pt-4">
-                             <span className="flex items-center gap-1"><FileText size={12}/> {paper.exam_type}</span>
-                             <span className="flex items-center gap-1"><Calendar size={12}/> {paper.exam_year}</span>
-                         </div>
-                     </div>
-                 ))
-             ) : (
-                 <div className="col-span-full flex flex-col items-center justify-center h-64 text-zinc-600">
-                    <p className="text-sm font-mono uppercase">No Papers Available Yet.</p>
-                 </div>
-             )}
+            {papers.length > 0 ? (
+              papers.map(paper => (
+                <div
+                  key={paper.id}
+                  onClick={() => handlePaperClick(paper)}
+                  className="bg-black border border-zinc-800 p-6 hover:border-red-900/50 hover:bg-zinc-900/10 cursor-pointer transition-all group relative"
+                >
+                  <div className="absolute top-4 right-4 opacity-50 group-hover:opacity-100 transition-opacity">
+                    <ArrowRight size={20} className="text-zinc-600 group-hover:text-red-500" />
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-red-600 mb-3">
+                    <GraduationCap size={14} />
+                    {paper.academic_year}
+                  </div>
+
+                  <h3 className="text-lg font-black text-white mb-2 line-clamp-2 h-14">
+                    {paper.subject}
+                  </h3>
+
+                  <div className="flex items-center gap-4 text-zinc-500 text-sm font-mono mt-4 border-t border-zinc-900 pt-4">
+                    <span className="flex items-center gap-1"><FileText size={12} /> {paper.exam_type}</span>
+                    <span className="flex items-center gap-1"><Calendar size={12} /> {paper.exam_year}</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full flex flex-col items-center justify-center h-64 text-zinc-600">
+                <p className="text-sm font-mono uppercase">No Papers Available Yet.</p>
+              </div>
+            )}
           </div>
         )}
 
         {isLoading && (
-             <div className="flex justify-center p-12"><Loader2 size={32} className="animate-spin text-red-600"/></div>
+          <div className="flex justify-center p-12"><Loader2 size={32} className="animate-spin text-red-600" /></div>
         )}
-{hasSearched && (() => {
-  const groupKey = activeGroupBy || groupByInput;
+        {hasSearched && (() => {
+          const groupKey = activeGroupBy || groupByInput;
 
-  if (!groupKey) {
-    // no grouping — simple flat render (keeps your original markup)
-    return displayQuestions.map((q) => (
-      <React.Fragment key={q.id}>
-        <div onClick={() => navigateToDetail(q.id)} className="bg-black border border-zinc-800 p-6 hover:border-red-900/40 cursor-pointer transition-colors group relative flex flex-col">
-          <div className="absolute top-4 right-4 text-zinc-500 font-mono text-xs border border-zinc-800 px-2 py-1">
-            {q.marks || 0} Marks
-          </div>
-          <div className="flex flex-wrap gap-2 mb-4 pr-16">
-            {q.isAiAnswered && (
-              <span className={`${styles.tag} border-purple-500/50 text-purple-400 hover:bg-purple-900/20 hover:border-purple-500`}>
-                <Bot size={12} className="mr-1" /> AI Answered
-              </span>
-            )}
-            <span onClick={(e) => handleTagClick(e, 'year', q.academic_year)} className={styles.tag}>{q.academic_year}</span>
-            <span onClick={(e) => handleTagClick(e, 'subject', q.subject)} className={styles.tag}>{q.subject}</span>
-            <span onClick={(e) => handleTagClick(e, 'exam', q.exam_type)} className={styles.tag}>{q.exam_type}</span>
-            <span onClick={(e) => handleTagClick(e, 'date', q.exam_year)} className={styles.tag}>{q.exam_year}</span>
-          </div>
-
-          <div className="flex gap-4">
-            <div className="shrink-0 w-12 pt-1 border-r border-zinc-800 mr-2">
-              <span className="text-zinc-500 font-black text-lg block">Q{q.question_number}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-gray-300 text-base font-sans font-light leading-relaxed mb-4">
-                <LatexRenderer text={q.content} />
-                {q.image_path && (
-                  <div className="mt-4 border border-zinc-800 bg-zinc-900/50 p-2 inline-block">
-                    <img src={q.image_path} alt="Question Diagram" className="max-h-48 object-contain" loading="lazy" />
+          if (!groupKey) {
+            // no grouping — simple flat render (keeps your original markup)
+            return displayQuestions.map((q) => (
+              <React.Fragment key={q.id}>
+                <div onClick={() => navigateToDetail(q.id)} className="bg-black border border-zinc-800 p-6 hover:border-red-900/40 cursor-pointer transition-colors group relative flex flex-col">
+                  <div className="absolute top-4 right-4 text-zinc-500 font-mono text-xs border border-zinc-800 px-2 py-1">
+                    {q.marks || 0} Marks
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
+                  <div className="flex flex-wrap gap-2 mb-4 pr-16">
+                    {q.isAiAnswered && (
+                      <span className={`${styles.tag} border-purple-500/50 text-purple-400 hover:bg-purple-900/20 hover:border-purple-500`}>
+                        <Bot size={12} className="mr-1" /> AI Answered
+                      </span>
+                    )}
+                    <span onClick={(e) => handleTagClick(e, 'year', q.academic_year)} className={styles.tag}>{q.academic_year}</span>
+                    <span onClick={(e) => handleTagClick(e, 'subject', q.subject)} className={styles.tag}>{q.subject}</span>
+                    <span onClick={(e) => handleTagClick(e, 'exam', q.exam_type)} className={styles.tag}>{q.exam_type}</span>
+                    <span onClick={(e) => handleTagClick(e, 'date', q.exam_year)} className={styles.tag}>{q.exam_year}</span>
+                  </div>
 
-          <div className="flex items-center justify-between border-t border-zinc-900 pt-4 mt-4 ml-16">
-            <span className="text-zinc-500 group-hover:text-red-500 flex items-center gap-2 text-[10px] lg:text-xs uppercase font-bold transition-colors">
-              <span className='hidden lg:inline-block'>View</span>Solution <ArrowRight size={14} />
-            </span>
-            <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1 border border-zinc-800">
-              <Star size={12} className="text-amber-500 fill-amber-500" />
-              <span className="text-[10px] lg:text-xs font-mono font-bold text-zinc-300">
-                <span className="hidden lg:inline-block">Avg</span> Diff: {q.avg_rating > 0 ? q.avg_rating.toFixed(1) : "N/A"} / 5
-              </span>
-            </div>
-          </div>
-        </div>
-      </React.Fragment>
-    ));
-  }
-
-  // Build buckets: groupLabel -> items[], preserving arrival order (displayQuestions order)
-  const buckets: Record<string, any[]> = {};
-  const groupOrder: string[] = [];
-
-  for (const q of displayQuestions) {
-    const label = String(getGroupLabel(q, groupKey) ?? '');
-    if (!buckets[label]) {
-      buckets[label] = [];
-      groupOrder.push(label); // first-seen order
-    }
-    buckets[label].push(q);
-  }
-
-  // Render groups in the order they first appeared
-  return groupOrder.map(gLabel => (
-    <React.Fragment key={gLabel}>
-      <div className={styles.groupHeader}>{gLabel}</div>
-      {buckets[gLabel].map(q => (
-        <React.Fragment key={q.id}>
-          <div onClick={() => navigateToDetail(q.id)} className="bg-black border border-zinc-800 p-6 hover:border-red-900/40 cursor-pointer transition-colors group relative flex flex-col">
-            <div className="absolute top-4 right-4 text-zinc-500 font-mono text-xs border border-zinc-800 px-2 py-1">
-              {q.marks || 0} Marks
-            </div>
-            <div className="flex flex-wrap gap-2 mb-4 pr-16">
-              {q.isAiAnswered && (
-                <span className={`${styles.tag} border-purple-500/50 text-purple-400 hover:bg-purple-900/20 hover:border-purple-500`}>
-                  <Bot size={12} className="mr-1" /> AI Answered
-                </span>
-              )}
-              <span onClick={(e) => handleTagClick(e, 'year', q.academic_year)} className={styles.tag}>{q.academic_year}</span>
-              <span onClick={(e) => handleTagClick(e, 'subject', q.subject)} className={styles.tag}>{q.subject}</span>
-              <span onClick={(e) => handleTagClick(e, 'exam', q.exam_type)} className={styles.tag}>{q.exam_type}</span>
-              <span onClick={(e) => handleTagClick(e, 'date', q.exam_year)} className={styles.tag}>{q.exam_year}</span>
-            </div>
-
-            <div className="flex gap-4">
-              <div className="shrink-0 w-12 pt-1 border-r border-zinc-800 mr-2">
-                <span className="text-zinc-500 font-black text-lg block">Q{q.question_number}</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-gray-300 text-base font-sans font-light leading-relaxed mb-4">
-                  <LatexRenderer text={q.content} />
-                  {q.image_path && (
-                    <div className="mt-4 border border-zinc-800 bg-zinc-900/50 p-2 inline-block">
-                      <img src={q.image_path} alt="Question Diagram" className="max-h-48 object-contain" loading="lazy" />
+                  <div className="flex gap-4">
+                    <div className="shrink-0 w-12 pt-1 border-r border-zinc-800 mr-2">
+                      <span className="text-zinc-500 font-black text-lg block">Q{q.question_number}</span>
                     </div>
-                  )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-gray-300 text-base font-sans font-light leading-relaxed mb-4">
+                        <LatexRenderer text={q.content} />
+                        {q.image_path && (
+                          <div className="mt-4 border border-zinc-800 bg-zinc-900/50 p-2 inline-block">
+                            <img src={q.image_path} alt="Question Diagram" className="max-h-48 object-contain" loading="lazy" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-zinc-900 pt-4 mt-4 ml-16">
+                    <span className="text-zinc-500 group-hover:text-red-500 flex items-center gap-2 text-[10px] lg:text-xs uppercase font-bold transition-colors">
+                      <span className='hidden lg:inline-block'>View</span>Solution <ArrowRight size={14} />
+                    </span>
+                    <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1 border border-zinc-800">
+                      <Star size={12} className="text-amber-500 fill-amber-500" />
+                      <span className="text-[10px] lg:text-xs font-mono font-bold text-zinc-300">
+                        <span className="hidden lg:inline-block">Avg</span> Diff: {q.avg_rating > 0 ? q.avg_rating.toFixed(1) : "N/A"} / 5
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </React.Fragment>
+            ));
+          }
 
-            <div className="flex items-center justify-between border-t border-zinc-900 pt-4 mt-4 ml-16">
-              <span className="text-zinc-500 group-hover:text-red-500 flex items-center gap-2 text-[10px] lg:text-xs uppercase font-bold transition-colors">
-                <span className='hidden lg:inline-block'>View</span>Solution <ArrowRight size={14} />
-              </span>
-              <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1 border border-zinc-800">
-                <Star size={12} className="text-amber-500 fill-amber-500" />
-                <span className="text-[10px] lg:text-xs font-mono font-bold text-zinc-300">
-                  <span className="hidden lg:inline-block">Avg</span> Diff: {q.avg_rating > 0 ? q.avg_rating.toFixed(1) : "N/A"} / 5
-                </span>
-              </div>
-            </div>
-          </div>
-        </React.Fragment>
-      ))}
-    </React.Fragment>
-  ));
-})()}
+          // Build buckets: groupLabel -> items[], preserving arrival order (displayQuestions order)
+          const buckets: Record<string, any[]> = {};
+          const groupOrder: string[] = [];
 
-        
+          for (const q of displayQuestions) {
+            const label = String(getGroupLabel(q, groupKey) ?? '');
+            if (!buckets[label]) {
+              buckets[label] = [];
+              groupOrder.push(label); // first-seen order
+            }
+            buckets[label].push(q);
+          }
+
+          // Render groups in the order they first appeared
+          return groupOrder.map(gLabel => (
+            <React.Fragment key={gLabel}>
+              <div className={styles.groupHeader}>{gLabel}</div>
+              {buckets[gLabel].map(q => (
+                <React.Fragment key={q.id}>
+                  <div onClick={() => navigateToDetail(q.id)} className="bg-black border border-zinc-800 p-6 hover:border-red-900/40 cursor-pointer transition-colors group relative flex flex-col">
+                    <div className="absolute top-4 right-4 text-zinc-500 font-mono text-xs border border-zinc-800 px-2 py-1">
+                      {q.marks || 0} Marks
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-4 pr-16">
+                      {q.isAiAnswered && (
+                        <span className={`${styles.tag} border-purple-500/50 text-purple-400 hover:bg-purple-900/20 hover:border-purple-500`}>
+                          <Bot size={12} className="mr-1" /> AI Answered
+                        </span>
+                      )}
+                      <span onClick={(e) => handleTagClick(e, 'year', q.academic_year)} className={styles.tag}>{q.academic_year}</span>
+                      <span onClick={(e) => handleTagClick(e, 'subject', q.subject)} className={styles.tag}>{q.subject}</span>
+                      <span onClick={(e) => handleTagClick(e, 'exam', q.exam_type)} className={styles.tag}>{q.exam_type}</span>
+                      <span onClick={(e) => handleTagClick(e, 'date', q.exam_year)} className={styles.tag}>{q.exam_year}</span>
+                    </div>
+
+                    <div className="flex gap-4">
+                      <div className="shrink-0 w-12 pt-1 border-r border-zinc-800 mr-2">
+                        <span className="text-zinc-500 font-black text-lg block">Q{q.question_number}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-gray-300 text-base font-sans font-light leading-relaxed mb-4">
+                          <LatexRenderer text={q.content} />
+                          {q.image_path && (
+                            <div className="mt-4 border border-zinc-800 bg-zinc-900/50 p-2 inline-block">
+                              <img src={q.image_path} alt="Question Diagram" className="max-h-48 object-contain" loading="lazy" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-zinc-900 pt-4 mt-4 ml-16">
+                      <span className="text-zinc-500 group-hover:text-red-500 flex items-center gap-2 text-[10px] lg:text-xs uppercase font-bold transition-colors">
+                        <span className='hidden lg:inline-block'>View</span>Solution <ArrowRight size={14} />
+                      </span>
+                      <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1 border border-zinc-800">
+                        <Star size={12} className="text-amber-500 fill-amber-500" />
+                        <span className="text-[10px] lg:text-xs font-mono font-bold text-zinc-300">
+                          <span className="hidden lg:inline-block">Avg</span> Diff: {q.avg_rating > 0 ? q.avg_rating.toFixed(1) : "N/A"} / 5
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </React.Fragment>
+              ))}
+            </React.Fragment>
+          ));
+        })()}
+
+
         {hasSearched && displayQuestions.length > 0 && hasMore && (
-            <div className="flex justify-center pt-8">
-                <button onClick={() => fetchQuestions(filters, searchQuery, groupByInput, false)} className="flex items-center gap-2 text-zinc-500 hover:text-white text-xs uppercase font-bold transition-colors" disabled={isLoading}>
-                    {isLoading ? <Loader2 size={16} className="animate-spin" /> : "Load More"}
-                </button>
-            </div>
+          <div className="flex justify-center pt-8">
+            <button onClick={() => fetchQuestions(filters, searchQuery, groupByInput, false)} className="flex items-center gap-2 text-zinc-500 hover:text-white text-xs uppercase font-bold transition-colors" disabled={isLoading}>
+              {isLoading ? <Loader2 size={16} className="animate-spin" /> : "Load More"}
+            </button>
+          </div>
         )}
       </div>
     </div>
