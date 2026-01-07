@@ -33,7 +33,7 @@ export default function ModerationPage() {
                 .from('admin_users')
                 .select('id')
                 .eq('email', email)
-                .single();
+                .maybeSingle();
 
             if (!admincheck) {
                 router.push('/resumes');
@@ -114,8 +114,8 @@ export default function ModerationPage() {
                             key={t.id}
                             onClick={() => setTab(t.id)}
                             className={`flex items-center gap-2 px-4 py-2 font-bold text-sm uppercase ${tab === t.id
-                                    ? 'bg-gradient-to-r from-red-600 to-pink-600 text-white'
-                                    : 'bg-zinc-900 border border-zinc-700 text-zinc-400 hover:text-white'
+                                ? 'bg-gradient-to-r from-red-600 to-pink-600 text-white'
+                                : 'bg-zinc-900 border border-zinc-700 text-zinc-400 hover:text-white'
                                 }`}
                         >
                             <t.icon size={16} />

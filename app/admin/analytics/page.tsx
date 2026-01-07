@@ -39,7 +39,7 @@ export default function AnalyticsDashboard() {
                     .from('admin_users')
                     .select('id')
                     .eq('email', email)
-                    .single();
+                    .maybeSingle();
 
                 if (!admincheck) {
                     router.push('/resumes');

@@ -46,7 +46,7 @@ export default function ReportsDashboard() {
                 .from('admin_users')
                 .select('id')
                 .eq('email', email)
-                .single();
+                .maybeSingle();
 
             if (!admincheck) {
                 router.push('/resumes');
@@ -224,9 +224,9 @@ export default function ReportsDashboard() {
                                                     {report.content_type}
                                                 </span>
                                                 <span className={`text-[10px] uppercase font-bold px-2 py-0.5 ${report.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
-                                                        report.status === 'action_taken' ? 'bg-green-500/20 text-green-400' :
-                                                            report.status === 'dismissed' ? 'bg-zinc-500/20 text-zinc-400' :
-                                                                'bg-blue-500/20 text-blue-400'
+                                                    report.status === 'action_taken' ? 'bg-green-500/20 text-green-400' :
+                                                        report.status === 'dismissed' ? 'bg-zinc-500/20 text-zinc-400' :
+                                                            'bg-blue-500/20 text-blue-400'
                                                     }`}>
                                                     {report.status.replace('_', ' ')}
                                                 </span>

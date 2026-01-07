@@ -29,7 +29,7 @@ export default function Navbar() {
         const email = session.user.email.toLowerCase();
         setIsSastra(isSastraEmail(email));
 
-        const { data } = await supabase.from('admin_users').select('id').eq('email', email).single();
+        const { data } = await supabase.from('admin_users').select('id').eq('email', email).maybeSingle();
         setIsAdmin(!!data);
       }
     };
@@ -41,7 +41,7 @@ export default function Navbar() {
       if (session?.user?.email) {
         const email = session.user.email.toLowerCase();
         setIsSastra(isSastraEmail(email));
-        const { data } = await supabase.from('admin_users').select('id').eq('email', email).single();
+        const { data } = await supabase.from('admin_users').select('id').eq('email', email).maybeSingle();
         setIsAdmin(!!data);
       } else {
         setIsSastra(false);

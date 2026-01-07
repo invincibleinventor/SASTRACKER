@@ -49,7 +49,7 @@ function ProjectsManagementContent() {
                     return;
                 }
 
-                const { data } = await supabase.from('admin_users').select('id').eq('email', session.user.email?.toLowerCase()).single();
+                const { data } = await supabase.from('admin_users').select('id').eq('email', session.user.email?.toLowerCase()).maybeSingle();
                 if (!data) {
                     router.push('/projects');
                     return;
