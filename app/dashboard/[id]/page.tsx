@@ -7,7 +7,6 @@ import { ArrowLeft, Loader2, Save, Trash2, CheckCircle, Edit2, Eye, ImageIcon } 
 
 const supabase = createPagesBrowserClient();
 
-// Inline LatexRenderer to ensure no import issues and match Upload page style
 const LatexRenderer = ({ text }: { text: string }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -61,12 +60,10 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
   const [content, setContent] = useState(question.content);
   const [difficulty, setDifficulty] = useState(question.difficulty_rating || 1);
   const [marks, setMarks] = useState(question.marks || 0);
-  // image state will hold either the existing path (string) or a new file (File object)
   const [image, setImage] = useState<string | File | null>(question.image_path);
   const fileRef = useRef<HTMLInputElement>(null);
   
   const handleSave = async () => { 
-    // Call onSave to propagate changes to parent/DB. The parent will handle image upload.
     await onSave({ 
         ...question, 
         content, 
@@ -78,7 +75,6 @@ const QuestionEditor = ({ question, onSave, onDelete }: any) => {
     setIsEditing(false); 
   };
   
-  // Helper to display image preview (works for both URL and File object)
   const getImagePreview = () => {
     if (!image) return null;
     if (typeof image === 'string') return image;

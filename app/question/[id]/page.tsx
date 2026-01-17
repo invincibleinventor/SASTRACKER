@@ -382,7 +382,6 @@ export default function QuestionDetailPage() {
           </div>
         </div>
 
-        {/* AI Solution Section */}
         <div className="mb-10">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles size={18} className="text-purple-500" />
@@ -411,7 +410,6 @@ export default function QuestionDetailPage() {
           )}
         </div>
 
-        {/* Human Answers Section */}
         <div className="bg-black border border-zinc-800 p-6 mb-10 shadow-lg">
           <h3 className="text-sm font-black uppercase tracking-widest text-zinc-500 mb-4">Contribute Solution</h3>
           <textarea

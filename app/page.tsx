@@ -188,15 +188,12 @@ export default function Home() {
       return;
     }
 
-    // prevent concurrent fetches reliably
     if (isLoadingRef.current) return;
     isLoadingRef.current = true;
     setIsLoading(true);
 
-    // determine page to request — optimistic reservation to avoid duplicate requests
-    const authoritativePage = feedCache.page ?? 0; // pages already loaded count
-    const requestingPage = isNewSearch ? 0 : authoritativePage; // request this page
-    // reserve next page immediately so another click won't request same page
+    const authoritativePage = feedCache.page ?? 0;
+    const requestingPage = isNewSearch ? 0 : authoritativePage;
     if (!isNewSearch) feedCache.page = requestingPage + 1;
 
     const from = requestingPage * ITEMS_PER_PAGE;
@@ -250,7 +247,6 @@ export default function Home() {
         isAiAnswered: q.has_ai_solution === true || (q.ai_answers && q.ai_answers.length > 0)
       }));
 
-      // sort each fetched page internally when grouping active so page is deterministic
       if (!currentQuery && currentGroup) {
         formatted.sort((a: any, b: any) => {
           const aKey = getGroupLabel(a, currentGroup) ?? '';
@@ -263,7 +259,6 @@ export default function Home() {
       }
 
       if (isNewSearch) {
-        // first page — replace cache and state
         feedCache = {
           queryKey,
           data: formatted,
@@ -275,24 +270,19 @@ export default function Home() {
         setPage(1);
         setHasSearched(true);
       } else {
-        // append new page after existing items — use functional state update to avoid stale closures
         feedCache.data = [...(feedCache.data || []), ...formatted];
         setDisplayQuestions(prev => {
-          // ensure we append to what's currently rendered (React will reconcile order correctly)
           return [...prev, ...formatted];
         });
-        // page already reserved above; reflect in react state
         setPage(prev => prev + 1);
       }
     } else if (error) {
-      // on error, if we optimistically reserved a page, roll it back so user can retry
       if (!isNewSearch) feedCache.page = Math.max(0, (feedCache.page ?? 1) - 1);
     }
 
     isLoadingRef.current = false;
     setIsLoading(false);
-  }, []); // deps intentionally empty; feedCache and refs are authoritative
-
+  }, []); 
 
   useEffect(() => {
     const urlFilters = {
@@ -529,7 +519,6 @@ export default function Home() {
           const groupKey = activeGroupBy || groupByInput;
 
           if (!groupKey) {
-            // no grouping — simple flat render (keeps your original markup)
             return displayQuestions.map((q) => (
               <React.Fragment key={q.id}>
                 <div onClick={() => navigateToDetail(q.id)} className="bg-black border border-zinc-800 p-6 hover:border-red-900/40 cursor-pointer transition-colors group relative flex flex-col">
@@ -580,7 +569,6 @@ export default function Home() {
             ));
           }
 
-          // Build buckets: groupLabel -> items[], preserving arrival order (displayQuestions order)
           const buckets: Record<string, any[]> = {};
           const groupOrder: string[] = [];
 
@@ -588,12 +576,10 @@ export default function Home() {
             const label = String(getGroupLabel(q, groupKey) ?? '');
             if (!buckets[label]) {
               buckets[label] = [];
-              groupOrder.push(label); // first-seen order
-            }
+              groupOrder.push(label);  }
             buckets[label].push(q);
           }
 
-          // Render groups in the order they first appeared
           return groupOrder.map(gLabel => (
             <React.Fragment key={gLabel}>
               <div className={styles.groupHeader}>{gLabel}</div>

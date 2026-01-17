@@ -1,4 +1,3 @@
-// app/auth/callback/route.ts
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -17,12 +16,8 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL("/auth", request.url));
     }
 
-    // **Important**: await cookies() here to unwrap the Promise and get RequestCookies
     const nextCookies = await cookies();
-
-    // Pass a synchronous function that returns the unwrapped RequestCookies.
-    // We cast to `any` to avoid type mismatches between libs/next versions.
-    const supabase = createRouteHandlerClient({
+  const supabase = createRouteHandlerClient({
       cookies: (() => nextCookies) as any,
     });
 

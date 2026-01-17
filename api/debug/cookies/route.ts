@@ -1,4 +1,3 @@
-// app/api/debug/cookies/route.ts (DEBUG - temporary)
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
